@@ -11,3 +11,15 @@ parameters:
         - routes/
 
     level: 7
+
+    ignoreErrors:
+        # ProfileValidationRules IS used — by the Livewire single-file component at
+        # resources/views/pages/settings/⚡profile.blade.php. PHPStan cannot see that:
+        # `paths` covers PHP source only, and adding resources/views/ makes it report
+        # every Livewire 4 SFC as `expr.resultUnused`, because it reads the
+        # `new class extends Component {...}` component definition as a statement whose
+        # result is discarded. No Livewire PHPStan extension exists to teach it otherwise.
+        # Remove this once one does, or once the trait moves to a class under app/.
+        -
+            identifier: trait.unused
+            path: app/Concerns/ProfileValidationRules.php
