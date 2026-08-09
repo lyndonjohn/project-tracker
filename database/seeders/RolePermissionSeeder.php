@@ -18,12 +18,13 @@ class RolePermissionSeeder extends Seeder
      *
      * @var list<string>
      */
-    public const PERMISSIONS = [
+    public const array PERMISSIONS = [
         'projects.view',
         'projects.create',
-        'projects.update-status-priority',
+        'projects.update-status',
         'projects.edit-details',
         'projects.delete',
+        'projects.restore',
         'roles.view',
         'roles.create',
         'roles.edit',
@@ -37,7 +38,27 @@ class RolePermissionSeeder extends Seeder
     ];
 
     /**
-     * Seed the permissions, the Super Admin role, and the Super Admin account.
+     * The permissions the Project Manager role starts with on a first deployment.
+     *
+     * These are convenience defaults, not a fixed set. Administrators may change this role's
+     * permissions at runtime, and that is a valid action, so they are applied only when the
+     * role is first created — re-running this seeder must never revoke a change made since.
+     *
+     * @var list<string>
+     */
+    public const array PROJECT_MANAGER_PERMISSIONS = [
+        'projects.view',
+        'projects.create',
+        'projects.update-status',
+        'projects.edit-details',
+        'projects.delete',
+        'projects.restore',
+    ];
+
+    /**
+     * Seed the permissions, the Project Manager role, the Super Admin role, and the Super Admin account.
+     *
+     * The Super Admin role and account are marked as protected so they can never be deleted.
      *
      * The package normally refreshes its permission cache from model events, which
      * a caller using "WithoutModelEvents" would mute, so the cache is flushed here
@@ -49,9 +70,18 @@ class RolePermissionSeeder extends Seeder
             Permission::findOrCreate($name);
         }
 
-        $this->seedSuperAdmin(
-            Role::findOrCreate(config('auth.super_admin.role')),
-        );
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+        $projectManager = Role::findOrCreate('Project Manager');
+
+        if ($projectManager->wasRecentlyCreated) {
+            $projectManager->syncPermissions(self::PROJECT_MANAGER_PERMISSIONS);
+        }
+
+        $superAdminRole = Role::findOrCreate(config('auth.super_admin.role'));
+        $superAdminRole->forceFill(['is_protected' => true])->save();
+
+        $this->seedSuperAdmin($superAdminRole);
 
         app(PermissionRegistrar::class)->forgetCachedPermissions();
     }
@@ -81,6 +111,8 @@ class RolePermissionSeeder extends Seeder
         if ($user->wasRecentlyCreated) {
             $user->forceFill(['email_verified_at' => now()])->save();
         }
+
+        $user->forceFill(['is_protected' => true])->save();
 
         $user->assignRole($role);
     }
