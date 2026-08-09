@@ -121,6 +121,65 @@ test('sorting by a whitelisted column orders the list and toggles direction', fu
         ->assertSeeInOrder(['Zulu', 'Alpha']);
 });
 
+test('sorting by the client column orders by the client name', function () {
+    actingAsUserAllowed('projects.view');
+    Project::factory()->for(Client::factory()->named('Zulu Industries'))->create(['name' => 'First Added']);
+    Project::factory()->for(Client::factory()->named('Alpha Industries'))->create(['name' => 'Second Added']);
+
+    indexPage()
+        ->call('sortBy', 'client_name')
+        ->assertSet('sort', 'client_name')
+        ->assertSeeInOrder(['Alpha Industries', 'Zulu Industries'])
+        ->call('sortBy', 'client_name')
+        ->assertSet('direction', 'desc')
+        ->assertSeeInOrder(['Zulu Industries', 'Alpha Industries']);
+});
+
+test('the client sort is not confused by the project name', function () {
+    actingAsUserAllowed('projects.view');
+    Project::factory()->for(Client::factory()->named('Zulu Industries'))->create(['name' => 'Aardvark']);
+    Project::factory()->for(Client::factory()->named('Alpha Industries'))->create(['name' => 'Zebra']);
+
+    indexPage()
+        ->call('sortBy', 'client_name')
+        ->assertSeeInOrder(['Zebra', 'Aardvark']);
+});
+
+test('the search input is a search field', function () {
+    actingAsUserAllowed('projects.view');
+
+    indexPage()->assertSeeHtml('type="search"');
+});
+
+test('resetting clears the search and every filter', function () {
+    actingAsUserAllowed('projects.view');
+    Project::factory()->create(['name' => 'Alpha']);
+
+    indexPage()
+        ->set('search', 'nothing matches this')
+        ->set('status', ProjectStatus::OnHold->value)
+        ->set('priority', ProjectPriority::High->value)
+        ->set('with_deleted', true)
+        ->assertDontSee('Alpha')
+        ->call('resetFilters')
+        ->assertSet('search', '')
+        ->assertSet('status', null)
+        ->assertSet('priority', null)
+        ->assertSet('with_deleted', false)
+        ->assertSee('Alpha');
+});
+
+test('resetting the filters leaves the chosen sort alone', function () {
+    actingAsUserAllowed('projects.view');
+
+    indexPage()
+        ->call('sortBy', 'name')
+        ->set('search', 'anything')
+        ->call('resetFilters')
+        ->assertSet('sort', 'name')
+        ->assertSet('direction', 'asc');
+});
+
 test('sorting by a column outside the whitelist falls back to the default', function (string $column) {
     actingAsUserAllowed('projects.view');
     Project::factory()->create(['name' => 'Alpha']);

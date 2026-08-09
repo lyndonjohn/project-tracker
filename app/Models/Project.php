@@ -4,9 +4,12 @@ namespace App\Models;
 
 use App\Enums\ProjectPriority;
 use App\Enums\ProjectStatus;
+use App\Validation\ProjectRules;
 use Carbon\CarbonImmutable;
 use Database\Factories\ProjectFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\Scope;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -66,6 +69,32 @@ class Project extends Model
     public function deletedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'deleted_by');
+    }
+
+    /**
+     * Order a project list by one of the whitelisted sort columns.
+     *
+     * Both the index page and the API list endpoint order through here, so a sortable
+     * column means the same thing on both. Anything outside the whitelist falls back to
+     * the default rather than reaching orderBy(), which interpolates identifiers rather
+     * than binding them.
+     *
+     * @param  Builder<Project>  $query
+     */
+    #[Scope]
+    protected function sorted(Builder $query, string $column, string $direction): void
+    {
+        $column = in_array($column, ProjectRules::SORTABLE, true) ? $column : 'created_at';
+        $direction = $direction === 'asc' ? 'asc' : 'desc';
+
+        // The client's name lives on another table; a correlated subquery orders by it
+        // without a join, which would otherwise have to be de-duplicated before paginating.
+        $query->orderBy(
+            $column === 'client_name'
+                ? Client::select('name')->whereColumn('clients.id', 'projects.client_id')
+                : $column,
+            $direction,
+        );
     }
 
     /**

@@ -86,6 +86,15 @@ new #[Title('Projects')] class extends Component {
     }
 
     /**
+     * Clear the search and every filter, leaving the chosen sort in place.
+     */
+    public function resetFilters(): void
+    {
+        $this->reset('search', 'status', 'priority', 'with_deleted');
+        $this->resetPage();
+    }
+
+    /**
      * Restore a soft-deleted project.
      */
     public function restore(int $project): void
@@ -129,7 +138,7 @@ new #[Title('Projects')] class extends Component {
             ))
             ->when($this->status, fn (Builder $query) => $query->where('status', $this->status))
             ->when($this->priority, fn (Builder $query) => $query->where('priority', $this->priority))
-            ->orderBy($this->sort, $this->direction)
+            ->sorted($this->sort, $this->direction)
             ->paginate($this->per_page);
     }
 
@@ -170,6 +179,7 @@ new #[Title('Projects')] class extends Component {
     <div class="grid gap-4 md:grid-cols-4">
         <flux:input
             wire:model.live.debounce.300ms="search"
+            type="search"
             icon="magnifying-glass"
             :label="__('Search')"
             :placeholder="__('Project, client or description')"
@@ -194,12 +204,20 @@ new #[Title('Projects')] class extends Component {
         </div>
     </div>
 
+    <div class="flex justify-end">
+        <flux:button variant="subtle" size="sm" icon="arrow-path" wire:click="resetFilters">
+            {{ __('Reset search and filters') }}
+        </flux:button>
+    </div>
+
     <flux:table :paginate="$this->projects">
         <flux:table.columns>
             <flux:table.column sortable :sorted="$sort === 'name'" :direction="$direction" wire:click="sortBy('name')">
                 {{ __('Name') }}
             </flux:table.column>
-            <flux:table.column>{{ __('Client') }}</flux:table.column>
+            <flux:table.column sortable :sorted="$sort === 'client_name'" :direction="$direction" wire:click="sortBy('client_name')">
+                {{ __('Client') }}
+            </flux:table.column>
             <flux:table.column sortable :sorted="$sort === 'status'" :direction="$direction" wire:click="sortBy('status')">
                 {{ __('Status') }}
             </flux:table.column>

@@ -83,6 +83,24 @@ test('a client that still has projects cannot be deleted', function () {
     $project->client->delete();
 })->throws(QueryException::class);
 
+test('the sorted scope orders by the client name for the client_name column', function () {
+    $zulu = Project::factory()->for(Client::factory()->named('Zulu Industries'))->create();
+    $alpha = Project::factory()->for(Client::factory()->named('Alpha Industries'))->create();
+
+    expect(Project::sorted('client_name', 'asc')->pluck('id')->all())->toBe([$alpha->id, $zulu->id])
+        ->and(Project::sorted('client_name', 'desc')->pluck('id')->all())->toBe([$zulu->id, $alpha->id]);
+});
+
+test('the sorted scope refuses a column outside the whitelist', function () {
+    // Created newest first, so falling back to created_at is distinguishable from id order.
+    $newer = Project::factory()->create(['created_at' => '2026-02-01 09:00:00']);
+    $older = Project::factory()->create(['created_at' => '2026-01-01 09:00:00']);
+
+    expect(Project::sorted('name); drop table projects;--', 'asc')->pluck('id')->all())
+        ->toBe([$older->id, $newer->id])
+        ->and(Project::count())->toBe(2);
+});
+
 test('client names are canonicalized to one key regardless of case and whitespace', function () {
     expect(Client::keyFor('Acme Corp'))->toBe('acme corp')
         ->and(Client::keyFor('  ACME   corp '))->toBe('acme corp')

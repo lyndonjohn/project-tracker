@@ -25,9 +25,13 @@ final class ProjectRules
      * come from a fixed list. Both surfaces validate against this one constant, so a new
      * sortable column cannot be enabled on one of them and not the other.
      *
+     * "client_name" is not a column on projects — Project::sorted() maps it to the
+     * client's name. It is listed here because this is what both surfaces validate
+     * against, and that scope is where every entry is turned into an ordering.
+     *
      * @var list<string>
      */
-    public const array SORTABLE = ['name', 'due_date', 'status', 'priority', 'created_at'];
+    public const array SORTABLE = ['name', 'client_name', 'due_date', 'status', 'priority', 'created_at'];
 
     /**
      * The directions a project list may be sorted in.
