@@ -36,6 +36,19 @@ class Project extends Model
     use HasFactory, SoftDeletes;
 
     /**
+     * The model's default attribute values.
+     *
+     * The database defaults "version" to 1, but a freshly created model does not re-read
+     * the row, so without this the optimistic-locking counter would be null in memory
+     * right after a create and the first edit would have no version to send back.
+     *
+     * @var array<string, mixed>
+     */
+    protected $attributes = [
+        'version' => 1,
+    ];
+
+    /**
      * The client this project belongs to.
      *
      * @return BelongsTo<Client, $this>
