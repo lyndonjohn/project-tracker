@@ -5,6 +5,7 @@ use App\Enums\ProjectStatus;
 use App\Models\Project;
 use App\Services\ProjectService;
 use App\Validation\ProjectRules;
+use Carbon\CarbonImmutable;
 use Flux\Flux;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
@@ -27,6 +28,12 @@ new #[Title('Projects')] class extends Component {
 
     #[Url]
     public ?string $priority = null;
+
+    #[Url]
+    public ?string $due_from = null;
+
+    #[Url]
+    public ?string $due_to = null;
 
     #[Url]
     public string $sort = 'created_at';
@@ -90,7 +97,7 @@ new #[Title('Projects')] class extends Component {
      */
     public function resetFilters(): void
     {
-        $this->reset('search', 'status', 'priority', 'with_deleted');
+        $this->reset('search', 'status', 'priority', 'due_from', 'due_to', 'with_deleted');
         $this->resetPage();
     }
 
@@ -138,6 +145,18 @@ new #[Title('Projects')] class extends Component {
             ))
             ->when($this->status, fn (Builder $query) => $query->where('status', $this->status))
             ->when($this->priority, fn (Builder $query) => $query->where('priority', $this->priority))
+            // The range only applies once both ends are set, so a half-filled range does
+            // not start hiding rows while the user is still picking the second date.
+            //
+            // Each end is widened to the whole day rather than compared against the bare
+            // date. MySQL stores a date column as "2026-03-15", SQLite as
+            // "2026-03-15 00:00:00", so comparing against the bare date would drop rows
+            // due on the "to" date under SQLite. The wider bounds are right on both, and
+            // still use the due_date index — whereDate() would wrap the column in a
+            // function and lose it.
+            ->when($this->due_from && $this->due_to, fn (Builder $query) => $query
+                ->where('due_date', '>=', CarbonImmutable::parse($this->due_from)->startOfDay())
+                ->where('due_date', '<=', CarbonImmutable::parse($this->due_to)->endOfDay()))
             ->sorted($this->sort, $this->direction)
             ->paginate($this->per_page);
     }
@@ -176,39 +195,50 @@ new #[Title('Projects')] class extends Component {
         @endcan
     </div>
 
-    <div class="grid gap-4 md:grid-cols-4">
-        <flux:input
-            wire:model.live.debounce.300ms="search"
-            type="search"
-            icon="magnifying-glass"
-            :label="__('Search')"
-            :placeholder="__('Project, client or description')"
-        />
+    <flux:card class="flex flex-col gap-4">
+        {{-- items-start keeps each field at its natural height. Fields are grids
+             themselves (see app.css), so a stretched one spreads its label and control
+             out to fill the row, misaligning it against its neighbours. --}}
+        <div class="grid items-start gap-4 md:grid-cols-2 xl:grid-cols-6">
+            <div class="xl:col-span-2">
+                <flux:input
+                    wire:model.live.debounce.300ms="search"
+                    type="search"
+                    icon="magnifying-glass"
+                    :label="__('Search')"
+                    :placeholder="__('Project, client or description')"
+                />
+            </div>
 
-        <flux:select wire:model.live="status" :label="__('Status')" :placeholder="__('All statuses')">
-            <flux:select.option value="">{{ __('All statuses') }}</flux:select.option>
-            @foreach (ProjectStatus::cases() as $case)
-                <flux:select.option value="{{ $case->value }}">{{ $case->label() }}</flux:select.option>
-            @endforeach
-        </flux:select>
+            <flux:select wire:model.live="status" :label="__('Status')" :placeholder="__('All statuses')">
+                <flux:select.option value="">{{ __('All statuses') }}</flux:select.option>
+                @foreach (ProjectStatus::cases() as $case)
+                    <flux:select.option value="{{ $case->value }}">{{ $case->label() }}</flux:select.option>
+                @endforeach
+            </flux:select>
 
-        <flux:select wire:model.live="priority" :label="__('Priority')" :placeholder="__('All priorities')">
-            <flux:select.option value="">{{ __('All priorities') }}</flux:select.option>
-            @foreach (ProjectPriority::cases() as $case)
-                <flux:select.option value="{{ $case->value }}">{{ $case->label() }}</flux:select.option>
-            @endforeach
-        </flux:select>
+            <flux:select wire:model.live="priority" :label="__('Priority')" :placeholder="__('All priorities')">
+                <flux:select.option value="">{{ __('All priorities') }}</flux:select.option>
+                @foreach (ProjectPriority::cases() as $case)
+                    <flux:select.option value="{{ $case->value }}">{{ $case->label() }}</flux:select.option>
+                @endforeach
+            </flux:select>
 
-        <div class="flex items-end">
-            <flux:checkbox wire:model.live="with_deleted" :label="__('Include deleted')" />
+            <flux:input wire:model.live="due_from" type="date" :label="__('Due from')" />
+
+            <flux:input wire:model.live="due_to" type="date" :label="__('Due to')" />
         </div>
-    </div>
 
-    <div class="flex justify-end">
-        <flux:button variant="subtle" size="sm" icon="arrow-path" wire:click="resetFilters">
-            {{ __('Reset search and filters') }}
-        </flux:button>
-    </div>
+        <flux:separator variant="subtle" />
+
+        <div class="flex flex-wrap items-center justify-between gap-4">
+            <flux:checkbox wire:model.live="with_deleted" :label="__('Include deleted')" />
+
+            <flux:button variant="subtle" size="sm" icon="arrow-path" wire:click="resetFilters">
+                {{ __('Reset search and filters') }}
+            </flux:button>
+        </div>
+    </flux:card>
 
     <flux:table :paginate="$this->projects">
         <flux:table.columns>

@@ -121,6 +121,64 @@ test('sorting by a whitelisted column orders the list and toggles direction', fu
         ->assertSeeInOrder(['Zulu', 'Alpha']);
 });
 
+test('the due date range narrows the list once both ends are set', function () {
+    actingAsUserAllowed('projects.view');
+    Project::factory()->create(['name' => 'Due In January', 'due_date' => '2026-01-15']);
+    Project::factory()->create(['name' => 'Due In March', 'due_date' => '2026-03-15']);
+    Project::factory()->create(['name' => 'Due In May', 'due_date' => '2026-05-15']);
+
+    indexPage()
+        ->set('due_from', '2026-03-01')
+        ->set('due_to', '2026-03-31')
+        ->assertDontSee('Due In January')
+        ->assertSee('Due In March')
+        ->assertDontSee('Due In May');
+});
+
+test('half a due date range leaves the list alone', function (string $property) {
+    actingAsUserAllowed('projects.view');
+    Project::factory()->create(['name' => 'Due In January', 'due_date' => '2026-01-15']);
+    Project::factory()->create(['name' => 'Due In May', 'due_date' => '2026-05-15']);
+
+    indexPage()
+        ->set($property, '2026-03-01')
+        ->assertSee('Due In January')
+        ->assertSee('Due In May');
+})->with(['due_from', 'due_to']);
+
+test('the due date filter includes projects due on the boundary dates', function () {
+    actingAsUserAllowed('projects.view');
+    Project::factory()->create(['name' => 'Due On The Day', 'due_date' => '2026-03-15']);
+
+    indexPage()
+        ->set('due_from', '2026-03-15')
+        ->set('due_to', '2026-03-15')
+        ->assertSee('Due On The Day');
+});
+
+test('a project with no due date is left out once the due date range is set', function () {
+    actingAsUserAllowed('projects.view');
+    Project::factory()->create(['name' => 'No Due Date', 'due_date' => null]);
+
+    indexPage()->assertSee('No Due Date');
+
+    indexPage()
+        ->set('due_from', '2026-01-01')
+        ->set('due_to', '2026-12-31')
+        ->assertDontSee('No Due Date');
+});
+
+test('a due date that is not a date is reset', function (string $property) {
+    actingAsUserAllowed('projects.view');
+    Project::factory()->create(['name' => 'Alpha']);
+
+    indexPage([$property => 'whenever'])
+        ->assertOk()
+        ->assertSet($property, null)
+        ->assertHasNoErrors()
+        ->assertSee('Alpha');
+})->with(['due_from', 'due_to']);
+
 test('sorting by the client column orders by the client name', function () {
     actingAsUserAllowed('projects.view');
     Project::factory()->for(Client::factory()->named('Zulu Industries'))->create(['name' => 'First Added']);
@@ -159,12 +217,16 @@ test('resetting clears the search and every filter', function () {
         ->set('search', 'nothing matches this')
         ->set('status', ProjectStatus::OnHold->value)
         ->set('priority', ProjectPriority::High->value)
+        ->set('due_from', '2030-01-01')
+        ->set('due_to', '2030-12-31')
         ->set('with_deleted', true)
         ->assertDontSee('Alpha')
         ->call('resetFilters')
         ->assertSet('search', '')
         ->assertSet('status', null)
         ->assertSet('priority', null)
+        ->assertSet('due_from', null)
+        ->assertSet('due_to', null)
         ->assertSet('with_deleted', false)
         ->assertSee('Alpha');
 });
