@@ -114,4 +114,21 @@ return [
 
     'password_timeout' => env('AUTH_PASSWORD_TIMEOUT', 10800),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Super Admin
+    |--------------------------------------------------------------------------
+    |
+    | The role that bypasses every authorization check via the "Gate::before"
+    | callback registered in the AppServiceProvider, along with the account
+    | seeded with that role. The password is only used when seeding.
+    |
+    */
+
+    'super_admin' => [
+        'role' => 'Super Admin',
+        'email' => env('SUPER_ADMIN_USER'),
+        'password' => env('SUPER_ADMIN_DEFAULT_PASSWORD'),
+    ],
+
 ];
