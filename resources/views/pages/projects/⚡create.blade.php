@@ -81,7 +81,10 @@ new #[Title('New project')] class extends Component {
 
         <flux:textarea wire:model="form.description" :label="__('Description')" rows="4" />
 
-        <div class="grid gap-6 md:grid-cols-2">
+        {{-- items-start keeps each field at its natural height. Fields are grids
+             themselves (see app.css), so a stretched one spreads its label, control
+             and error out to fill the row, misaligning it against its neighbour. --}}
+        <div class="grid items-start gap-6 md:grid-cols-2">
             <flux:select wire:model="form.status" :label="__('Status')" :placeholder="__('Not set')">
                 <flux:select.option value="">{{ __('Not set') }}</flux:select.option>
                 @foreach (ProjectStatus::cases() as $case)
