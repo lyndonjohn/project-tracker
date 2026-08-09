@@ -7,6 +7,18 @@ use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
 
+/**
+ * The seeder skips the Super Admin account unless both SUPER_ADMIN_* variables are set,
+ * and .env.example ships the password blank on purpose. Pinning the credentials here keeps
+ * these tests independent of whatever a given machine or CI runner has in its .env.
+ */
+beforeEach(function () {
+    config([
+        'auth.super_admin.email' => 'super-admin@example.test',
+        'auth.super_admin.password' => 'super-admin-password',
+    ]);
+});
+
 test('every application permission is seeded', function () {
     $this->seed(RolePermissionSeeder::class);
 
