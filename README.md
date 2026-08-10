@@ -161,6 +161,83 @@ own inputs:
 }
 ```
 
+## Edge cases
+
+Validation covers a form filled in wrongly. These are the cases that come from two people working
+at once, from data that already exists, or from a request that was never typed into a form at all.
+
+### Two people editing the same project
+
+Say both open Project 1. User A renames it to "Project 1.2" and saves. User B, still looking at the
+form they opened earlier, renames it to "Project 2" and saves a moment later.
+
+B's save is refused. The project stays as "Project 1.2", and A's work is not lost. B sees:
+
+> This project was updated by someone else. Refresh to see the latest version.
+
+B's own typing stays in the form, so they can look at what changed, decide whether they still want
+their edit, and apply it again. Refusing the save and also clearing the form would punish B twice
+for A's timing.
+
+This works through a `version` number that every project carries and that goes up by one on each
+save. Both forms were opened while the project
+was at version 1, so both held that number. A's save matched and became version 2. B's save still
+claimed version 1, which no longer matched, so nothing was written. If B had opened the page after
+A saved, they would have held version 2 and their save would have gone through, which is right,
+because then they chose the name while looking at the current one.
+
+On the API the same thing returns `409` with the current version number, so a client can read the
+project again, merge its change in and retry.
+
+### Two people creating the same client at the same time
+
+Client names are checked before a new one is created, but a check followed by an insert is two
+separate steps, and two requests can both pass the check. Rather than locking the table for every
+save, the database itself decides: the client name column is unique, so the second insert fails,
+and the app catches that, reads the row the first request created and carries on with it. The person
+saving sees a normal successful save, not an error.
+
+### Data that already exists
+
+- **The same client written differently.** Typing "  ACME   corp " matches the existing "Acme Corp"
+  instead of creating a second one. Spacing and capitals are ignored when matching, and the first
+  spelling is the one kept for display.
+- **Reusing the name of a deleted project.** Refused, because restoring that project later would
+  leave the client with two projects of the same name.
+- **Statuses set in an unusual order.** A project can move between any two statuses, so it is
+  possible to complete one and then move it back to In Progress. The time check works in both
+  directions, so it cannot be completed before it started, and cannot be started after it was
+  completed.
+- **Deleting something twice.** Deleting a project that is already deleted returns `404` rather
+  than pretending to work. Restoring one that is not deleted succeeds and changes nothing.
+- **Records that other things depend on.** A client cannot be deleted while it still has projects.
+  Deleting a user does not delete their projects, it just clears the record of who deleted what.
+  The Super Admin role and account are marked protected and cannot be deleted by anyone.
+
+### Requests that were not typed into a form
+
+The list page keeps its filters in the address bar, so they can be edited, bookmarked, or shared
+after the options change. The API takes the same values as query parameters.
+
+- **A page size of 100000** would try to load the whole table. It is capped at 100. In the UI an
+  out-of-range value quietly falls back to the default, because a person following an old bookmark
+  cannot act on an error message.
+- **Sorting by a column that is not on the list** is refused. Column names cannot be passed to the
+  database as safe parameters the way values can, so only the six sortable columns are ever used.
+  Anything else is `422` on the API and the default order in the UI.
+- **A field sent as a list instead of text**, like `client_name[]=Acme`, is caught and returned as a
+  normal validation error instead of crashing the request.
+- **An empty dropdown.** A cleared field in the browser arrives as an empty string rather than as
+  nothing at all, which would slip past the "optional, but must be valid" rules and fail later in a
+  place with no useful message. Empty optional fields are turned into nothing before validation.
+
+### When something unexpected goes wrong
+
+If a save fails for a reason the app does not recognise, such as the database being unavailable, the
+error is written to the log and the person sees "Something went wrong. Please try again." Database
+messages and stack traces are never shown. The same applies to the API, which returns its own status
+codes and messages and nothing about the internals, including on a missing project.
+
 ## Technology choices
 
 | Choice | Why |
