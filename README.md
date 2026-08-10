@@ -1,30 +1,32 @@
 # Project Tracker
 
-Project management for staff and project managers — create projects against a client, track status
-and priority, and soft-delete or restore them. Built with Laravel 13, Livewire 4 and Flux UI, with
-role-based permissions throughout and a JSON API for future frontends.
+A tool for a digital agency to track client projects. You can create projects for a client, set
+their status and priority, search and filter the list, and delete or restore them.
+
+Built with Laravel 13, Livewire 4 and Flux UI. Access is controlled by roles and permissions, and
+there is a JSON API for a future frontend.
 
 ## Prerequisites
 
-Install these first. `composer setup` uses them; it does not install them.
+Install these first. `composer setup` uses them, it does not install them.
 
 | | Version | Check with |
 | --- | --- | --- |
 | PHP | **8.5 or newer** | `php -v` |
 | Composer | 2.x | `composer --version` |
-| Node.js | 20.19+ or 22.12+ (Vite 8) | `node -v` |
+| Node.js | 20.19+ or 22.12+ (needed by Vite 8) | `node -v` |
 
-SQLite is the default database and needs no server — the setup command creates the file.
+SQLite is the default database. It needs no server, and the setup command creates the file for you.
 
-**PHP 8.5 is a hard requirement**, declared as `"php": "^8.5"` in `composer.json`. On anything older,
-`composer install` refuses to run rather than installing a broken tree:
+**PHP 8.5 is required.** It is set as `"php": "^8.5"` in `composer.json`, so on an older version
+`composer install` stops instead of installing a broken set of packages:
 
 ```
 laravel/livewire-starter-kit dev-main requires php (^8.5)
 ```
 
-[Laravel Herd](https://herd.laravel.com) is the quickest way to get it on macOS or Windows — it
-bundles PHP, so installing Herd covers the first row of the table.
+If you do not have PHP 8.5, [Laravel Herd](https://herd.laravel.com) is the easiest way to get it on
+macOS or Windows. It includes PHP, so installing Herd covers the first row of the table.
 
 ## Setup
 
@@ -41,7 +43,7 @@ composer setup
 3. creates the empty database file at `database/database.sqlite`
 4. `php artisan key:generate` — writes `APP_KEY` into `.env`
 5. `php artisan migrate` — creates the tables
-6. `php artisan db:seed` — roles, permissions, the Super Admin account, and sample projects
+6. `php artisan db:seed` — roles, permissions, the demo accounts, and sample projects
 7. `npm install` — downloads this project's Node packages into `node_modules/`
 8. `npm run build` — compiles the CSS and JavaScript
 
@@ -51,163 +53,160 @@ composer setup
 composer dev
 ```
 
-The app is then at **http://localhost:8000**, with the Vite dev server, a queue listener and a log
-tail running alongside it. Stop it with `Ctrl-C`.
+The app is then at **http://localhost:8000**. This also starts the Vite dev server, a queue listener
+and a log tail. Press `Ctrl-C` to stop them all.
 
 If you use [Laravel Herd](https://herd.laravel.com), the site is already served at
-`http://project-tracker.test` and you only need `npm run dev` for asset hot-reloading. Run
-`herd secure` if you want it over HTTPS.
+`http://project-tracker.test` and you only need `npm run dev` for asset reloading. Run `herd secure`
+if you want it over HTTPS.
 
-Log in with one of the accounts below, then go to **Projects** in the sidebar. The API is at
-`/api/v1` — see [API](#api).
+Log in with one of the accounts below, then open **Projects** in the sidebar. The API lives at
+`/api/v1`, described under [API](#api).
 
 ## Logging in
 
-Seeding creates two accounts, both with the password `password`:
+Seeding creates two accounts. Both use the password `password`.
 
-| Email | Role | Use it to |
+| Email | Role | What it is for |
 | --- | --- | --- |
-| `superadmin@example.com` | Super Admin | See everything — this account passes **every** permission check through a `Gate::before` bypass |
-| `pm@example.com` | Project Manager | Exercise the app as a normally-permissioned user, where permissions actually decide things |
+| `superadmin@example.com` | Super Admin | Seeing everything. This account passes every permission check automatically. |
+| `pm@example.com` | Project Manager | Using the app as a normal user, where permissions actually decide what you can do. |
 
-Prefer `pm@example.com` when you want to see the authorization behave. Because the Super Admin
-bypasses every gate, nothing it does can ever produce a 403, which makes the permission checks look
-like they do nothing.
+Use `pm@example.com` if you want to see the permission checks working. The Super Admin skips all of
+them, so it can never be refused, which makes the checks look like they do nothing.
 
-**Both are local development defaults.** The Super Admin comes from the `SUPER_ADMIN_*` values in
-`.env`, so set real ones through the environment anywhere this is deployed — the seeder creates that
-account only when both variables are present. The Project Manager is seeded **only outside
-production**, alongside the sample projects.
+**Both are local development defaults.** The Super Admin details come from the `SUPER_ADMIN_*` values
+in `.env`, so set real ones through the environment if you deploy this. That account is only created
+when both values are set. The Project Manager account is only seeded outside production, along with
+the sample projects.
 
-Registering a new account through the UI gets you a user with **no role**, which by design cannot
-reach the project pages — useful for seeing a refusal firsthand.
+If you register a new account through the UI, it has no role and cannot open the project pages. That
+is on purpose, and it is a quick way to see a refusal for yourself.
 
 ## What's in it
 
-**Projects** (`/projects`) — a paginated list with search across project name, client name and
-description; filters for status, priority and a due-date range; sortable columns; and a toggle for
-including deleted projects.
+**Projects** (`/projects`) is a paginated list. You can search by project name, client name or
+description, filter by status, priority and a due-date range, sort the columns, and tick a box to
+include deleted projects.
 
-- **Create / edit** — the client is a free-text autocomplete: type an existing client to reuse it, or
-  a new name to create it on save. Project names are unique *per client*, so two clients can each
-  have a "Website Redesign".
-- **Status** — changed through a confirmation modal that stamps `started_at` when a project moves to
-  In Progress and `completed_at` when it moves to Completed, defaulting to now but editable.
-- **Delete / restore** — soft deletes, recording who deleted the project; deleted rows can be
-  restored from the list.
-- **Concurrent edits** — projects carry a version counter. If someone else saves while you have the
-  form open, your save is refused with a message rather than silently overwriting their work.
+- **Create and edit.** The client field is a searchable text box. Type an existing client to reuse
+  it, or type a new name and it is created when you save. Project names are unique per client, so
+  two clients can each have a "Website Redesign".
+- **Status.** Changed through a confirmation box, which also records the time. Moving a project to
+  In Progress records when it started, and moving it to Completed records when it finished. The time
+  defaults to now, and you can change it.
+- **Delete and restore.** Deleting hides the project and records who did it. You can restore it from
+  the list.
+- **Editing at the same time as someone else.** If a colleague saves while you have the form open,
+  your save is refused with a message instead of quietly overwriting their work.
 
-**Roles and permissions** — six project permissions (`projects.view`, `create`, `update-status`,
-`edit-details`, `delete`, `restore`) are assigned to roles, never directly to users. A **Project
-Manager** role is seeded holding all six. The **Super Admin** role holds no permission rows and
-passes every check through a `Gate::before` bypass. Both the Super Admin role and account are
-flagged protected and can never be deleted, by anyone.
+**Roles and permissions.** There are six project permissions: `projects.view`, `create`,
+`update-status`, `edit-details`, `delete` and `restore`. They are given to roles, never straight to a
+person. The seeded **Project Manager** role has all six. The **Super Admin** role has none, because
+it passes every check anyway. The Super Admin role and account are marked as protected and cannot be
+deleted by anyone.
 
-**API** — the same features over JSON at `/api/v1`, for a future frontend. See [API](#api) below.
+**API.** The same features over JSON at `/api/v1`, ready for a future frontend. See [API](#api).
 
 ## Technology choices
 
 | Choice | Why |
 | --- | --- |
-| **Laravel 13** (PHP 8.5) | One of the permitted backend options, and the one whose batteries — Eloquent, validation, policies/gates, queues, first-party auth — cover most of this brief without third-party glue. |
-| **Livewire 4 + Flux UI 2** | The UI is server-rendered from the same PHP that owns the rules, so validation and authorization exist once instead of being restated in a client. See the note below on the frontend options. |
-| **SQLite** | Permitted, and the only option that needs no server: `composer setup` creates a file and the app runs. The code is driver-agnostic — see the due-date note in `Project::listing()` for a place where that was deliberate. |
-| **Fortify** | First-party authentication (login, registration, password reset, 2FA, passkeys) without hand-rolling it, and headless, so it does not dictate the UI. |
-| **spatie/laravel-permission** | Roles and permissions are the standard solution here; writing a fifth-rate version of it would not have been a better use of the time. |
-| **Sanctum** | Token auth for the API. First-party, and it covers both futures — bearer tokens for a separate frontend, cookie auth for a same-domain SPA — without OAuth2's machinery, which nothing here needs. |
-| **Pest 5, Pint, Larastan (level 7)** | Tests, formatting and static analysis, all runnable as one `composer test`. |
+| **Laravel 13** (PHP 8.5) | One of the backend options the brief allows. It already includes most of what this app needs: the database layer, validation, authorization, and first-party login. |
+| **Livewire 4 + Flux UI 2** | The pages are rendered by the same PHP that holds the rules, so validation and permissions are written once instead of twice. There is a note on the frontend options below. |
+| **SQLite** | Allowed by the brief, and the only option that needs no database server. `composer setup` creates a file and the app runs. The code does not depend on SQLite, so MySQL or PostgreSQL work too. |
+| **Fortify** | Gives login, registration, password reset, two-factor and passkeys without writing them by hand. It has no UI of its own, so it does not dictate how the pages look. |
+| **spatie/laravel-permission** | The standard package for roles and permissions in Laravel. Writing a weaker version of it would not have been a good use of the time. |
+| **Sanctum** | Token login for the API. It is first-party, and it covers both likely futures: tokens for a separate frontend, or cookies for a single-page app on the same domain. OAuth2 would be more machinery than this needs. |
+| **Pest 5, Pint, Larastan** | Tests, code formatting and static analysis. All three run together with `composer test`. |
 
-**On the frontend options.** The brief lists React, Vue, Angular and Next.js. This uses Livewire,
-which is Laravel's own server-rendered component layer, because splitting a CRUD app across two
-codebases would have meant maintaining the validation and permission rules twice — the single
-biggest source of drift in an app this shape. The JSON API is built and documented precisely so a
-React or Vue frontend can be added later without touching the domain layer: it already covers every
-feature the UI has.
+**About the frontend options.** The brief lists React, Vue, Angular and Next.js. This app uses
+Livewire, which is Laravel's own way of building pages on the server. The reason is that splitting a
+small CRUD app across two codebases means writing the validation and permission rules twice, and
+those two copies drift apart over time. The JSON API is fully built and documented, so a React or
+Vue frontend can be added later without changing any of the business logic.
 
 ## API
 
-A versioned JSON API covering everything the UI does. The Livewire pages do not consume it — they
-talk to the server over Livewire's own protocol — so the two surfaces share the service and
-validation layers rather than one calling the other.
+A versioned JSON API that covers everything the UI does. The Livewire pages do not call it. They
+talk to the server their own way, and both share the same service and validation classes, so neither
+one is built on top of the other.
 
-**[`docs/api.md`](docs/api.md) is the full reference** — every endpoint, every parameter, every
-request variant and the exact response it returns, captured from a running instance. What follows
-here is the short version: how to get a token and make your first call.
+**[`docs/api.md`](docs/api.md) is the full reference.** It lists every endpoint, every parameter,
+every request you can make and the exact response you get back, all captured from a running copy of
+the app. What follows here is the short version: how to get a token and make your first call.
 
 ### Authenticating
 
-Requests carry a Sanctum bearer token. There is no token endpoint — tokens are issued from the
-console, for any user:
+Requests use a Sanctum bearer token. There is no endpoint that hands them out. You create one from
+the command line, for any user:
 
 ```bash
 php artisan api:token pm@example.com
 ```
 
-It prints the user, the roles the token will therefore carry, and the token itself. Sanctum stores
-only a hash, so that plain text is shown once and cannot be recovered afterwards — copy it when it
-appears. Pass `--name` to label one (`php artisan api:token pm@example.com --name=postman`) so it
-can be revoked without affecting the others.
+It prints the user, the roles the token will carry, and the token itself. Sanctum only stores a
+hashed copy, so the token is shown once and cannot be looked up later. Copy it when it appears. Add
+`--name` to label a token (`php artisan api:token pm@example.com --name=postman`) so you can revoke
+that one without affecting the others.
 
 ### Trying it in Postman
 
-1. Run `php artisan api:token pm@example.com` and copy the token it prints.
-2. In Postman, set the request's **Authorization** type to **Bearer Token** and paste it — or add the
-   header by hand as `Authorization: Bearer <token>`.
+1. Run `php artisan api:token pm@example.com` and copy the token.
+2. In Postman, set the request's **Authorization** type to **Bearer Token** and paste it in. You can
+   also add the header yourself as `Authorization: Bearer <token>`.
 3. Add an `Accept: application/json` header.
 4. `GET http://project-tracker.test/api/v1/projects`
 
-Issue a token for `superadmin@example.com` to watch every endpoint succeed, and one for an account
-with fewer permissions to watch the same request come back `403`.
+Try a token for `superadmin@example.com` to see every endpoint succeed, then one for an account with
+fewer permissions to see the same request come back as `403`.
 
 ```bash
 curl -H "Authorization: Bearer <token>" -H "Accept: application/json" http://project-tracker.test/api/v1/projects
 ```
 
-The examples below use `http://project-tracker.test`, which is what Herd serves until you run
-`herd secure`. Swap in whatever host and scheme you serve the app on — `http://localhost:8000` under
-`composer dev`, or `https://` once the site is secured. Nothing in the API depends on which.
+The examples use `http://project-tracker.test`, which is what Herd serves before you run
+`herd secure`. Use whatever address you serve the app on: `http://localhost:8000` under
+`composer dev`, or an `https://` address once the site is secured. The API works the same either way.
 
-A token acts as its owner and carries **all** of that user's permissions — abilities are not scoped
-yet. Treat one as equivalent to the owner's password, and issue a separate token per integration so
-any one of them can be revoked on its own.
+A token has all the permissions its owner has. Treat it like that person's password, and create a
+separate token for each integration so you can revoke one without breaking the rest.
 
-Rate limit: **60 requests per minute**, counted per user (falling back to the IP for unauthenticated
-requests), so staff behind one office NAT do not share a bucket. Exceeding it returns `429` with a
-`Retry-After` header.
+The API allows **60 requests per minute per user**. Unauthenticated requests are counted by IP
+address instead. Going over returns `429` with a `Retry-After` header.
 
 ### Endpoints
 
-Every route requires authentication plus the listed permission.
+Every route needs a valid token and the permission listed.
 
 | Method | URI | Purpose | Permission |
 | --- | --- | --- | --- |
-| GET | `/api/v1/projects` | List, with the UI's search, filters and sorting | `projects.view` |
-| GET | `/api/v1/projects/{project}` | Read one | `projects.view` |
-| POST | `/api/v1/projects` | Create, creating the client if it is new | `projects.create` |
-| PUT | `/api/v1/projects/{project}` | Update details (not status) | `projects.edit-details` |
-| PATCH | `/api/v1/projects/{project}/status` | Change status, stamping its timestamp | `projects.update-status` |
-| DELETE | `/api/v1/projects/{project}` | Soft delete | `projects.delete` |
+| GET | `/api/v1/projects` | List projects, with the same search, filters and sorting as the UI | `projects.view` |
+| GET | `/api/v1/projects/{project}` | Read one project | `projects.view` |
+| POST | `/api/v1/projects` | Create a project, and its client if the name is new | `projects.create` |
+| PUT | `/api/v1/projects/{project}` | Update the details, but not the status | `projects.edit-details` |
+| PATCH | `/api/v1/projects/{project}/status` | Change the status and record the time | `projects.update-status` |
+| DELETE | `/api/v1/projects/{project}` | Delete a project | `projects.delete` |
 | POST | `/api/v1/projects/{project}/restore` | Restore a deleted project | `projects.restore` |
 
 ### Listing
 
-`GET /api/v1/projects` accepts the same parameters the index page uses, so a client can reproduce
-any list a user can see:
+`GET /api/v1/projects` takes the same options as the list page, so a client can reproduce any list a
+user can see:
 
 | Parameter | Accepts |
 | --- | --- |
-| `search` | Matches project name, description, or client name |
+| `search` | Matches project name, description or client name |
 | `status` | `planning`, `in_progress`, `on_hold`, `completed` |
 | `priority` | `low`, `medium`, `high` |
-| `due_from`, `due_to` | Dates; applied as a range, and only when both are given |
+| `due_from`, `due_to` | Dates. The range is only applied when you give both. |
 | `sort` | `name`, `client_name`, `due_date`, `status`, `priority`, `created_at` |
 | `direction` | `asc`, `desc` (default `desc`) |
-| `with_deleted` | Boolean; deleted projects are excluded unless this is set |
+| `with_deleted` | Boolean. Deleted projects are left out unless this is set. |
 | `per_page` | 1–100 (default 25) |
 
-Anything outside those values is a `422` rather than a silently ignored parameter — the sort
-whitelist in particular is what keeps user input out of `orderBy()`.
+Anything outside these values returns `422` instead of being quietly ignored. The list of sortable
+columns matters most: it is what keeps user input out of the `ORDER BY` clause.
 
 ```bash
 curl -H "Authorization: Bearer <token>" -H "Accept: application/json" \
@@ -238,10 +237,10 @@ curl -H "Authorization: Bearer <token>" -H "Accept: application/json" \
 }
 ```
 
-`status` and `priority` are given as both value and label, so a client can display one and filter on
-the other without keeping its own copy of the wording. Both keys are **omitted entirely** when the
-project has no status or priority set. `deleted_at` and `deleted_by` appear only on deleted
-projects.
+`status` and `priority` come back with both the value and the label, so you can show one and filter
+on the other without keeping your own copy of the wording. When a project has no status or priority,
+those keys are left out of the response entirely rather than sent as `null`. `deleted_at` and
+`deleted_by` only appear on deleted projects.
 
 ### Creating and updating
 
@@ -251,13 +250,13 @@ curl -X POST -H "Authorization: Bearer <token>" -H "Content-Type: application/js
   http://project-tracker.test/api/v1/projects
 ```
 
-`client_name` is free text: an existing client is matched case- and whitespace-insensitively, and an
-unknown name creates one. Project names are unique **per client**, so two clients may each have a
-"Website Redesign" — including against a *deleted* project, which still holds its name so that
-restoring it cannot produce a duplicate.
+`client_name` is plain text. An existing client is matched even if the spacing or capitals differ,
+and a new name creates a client. Project names are unique per client, so two clients can each have a
+"Website Redesign". A deleted project still holds its name, so restoring it can never create a
+duplicate.
 
-Status is not accepted by `PUT`; it has its own endpoint because it also stamps a timestamp and
-carries its own permission:
+`PUT` does not accept a status. Status has its own endpoint, because changing it also records a time
+and needs a different permission:
 
 ```bash
 curl -X PATCH -H "Authorization: Bearer <token>" -H "Content-Type: application/json" -H "Accept: application/json" \
@@ -265,14 +264,14 @@ curl -X PATCH -H "Authorization: Bearer <token>" -H "Content-Type: application/j
   http://project-tracker.test/api/v1/projects/8/status
 ```
 
-Moving to In Progress stamps `started_at`, and to Completed stamps `completed_at`, using
-`changed_at` (any datetime, not just now). The bound is symmetric: you cannot complete a project
-before it started, nor start one after it was completed.
+Moving to In Progress records `started_at`, and moving to Completed records `completed_at`, using the
+`changed_at` you send. It can be any date and time, not just now. The check works both ways: you
+cannot complete a project before it started, and you cannot start one after it was completed.
 
-### Concurrent writes
+### Two people saving at once
 
-Every project carries a `version`. `PUT` and `PATCH` require the version you last read, and a write
-against a stale one changes nothing and returns **409**:
+Every project has a `version` number. `PUT` and `PATCH` need the version you last read. If someone
+else saved first, your write changes nothing and you get a **409**:
 
 ```json
 {
@@ -281,23 +280,22 @@ against a stale one changes nothing and returns **409**:
 }
 ```
 
-The current version comes back so a client can re-read, merge and retry. `DELETE` and restore take
-no version — they do not overwrite field values, so a stale caller deleting a project still deletes
-the project they meant to.
+The current version is included, so you can read the project again, merge your change into it and
+retry. `DELETE` and restore do not need a version, because they do not overwrite any field values.
 
 ### Responses
 
 | Status | When |
 | --- | --- |
-| `200` / `201` / `204` | Read or write succeeded; `201` on create, `204` on delete |
-| `401` | Missing or invalid token |
-| `403` | Authenticated, but the user's roles do not grant the permission |
-| `404` | No such project, or it is deleted and the route does not include deleted ones |
-| `409` | Version conflict — someone else saved first |
-| `422` | Validation failed; `errors` is keyed by field |
-| `429` | Rate limited; retry after the `Retry-After` header |
+| `200` / `201` / `204` | It worked. `201` when something is created, `204` after a delete. |
+| `401` | The token is missing or invalid |
+| `403` | The token is valid, but its owner does not have the permission |
+| `404` | No such project, or it is deleted and this route does not include deleted ones |
+| `409` | Someone else saved first |
+| `422` | Validation failed. `errors` lists the problems by field. |
+| `429` | Too many requests. Wait for the time in the `Retry-After` header. |
 
-Errors are JSON regardless of the `Accept` header, since every route here is under `api/*`:
+Errors are always JSON, even without an `Accept` header, because everything here is under `api/*`:
 
 ```json
 {
@@ -308,80 +306,92 @@ Errors are JSON regardless of the `Accept` header, since every route here is und
 
 ## Assumptions
 
-Decisions the [brief](https://github.com/koda-devteam-ops/fullstack-developer-assessment/blob/main/REQUIREMENTS.md)
-did not specify. Two of them change how a listed endpoint behaves, so they lead.
+These are decisions the
+[brief](https://github.com/koda-devteam-ops/fullstack-developer-assessment/blob/main/REQUIREMENTS.md)
+did not cover. Two of them change how one of its endpoints behaves, so those come first.
 
-### Two deviations worth knowing about first
+### Two things that differ from the brief
 
-**`DELETE /projects/:id` soft-deletes.** The brief says "Delete project". The row is marked deleted,
-records who deleted it, and can be restored; it is gone from every default list and the API returns
-`404` for it afterwards, so a consumer sees a delete. It is still in the table. Losing a client's
-project history to one mis-click seemed the worse failure, and restoring costs two columns and a
-route.
+**`DELETE /projects/:id` hides a project instead of erasing it.** The brief says "Delete project".
+Here the row is marked as deleted, along with who deleted it, and it can be restored. It disappears
+from every normal list and the API returns `404` for it afterwards, so from the outside it behaves
+like a delete. The row itself is still in the table. Losing a client's project history to one
+mis-click felt like the worse outcome, and being able to undo it only costs two columns and one
+extra route.
 
-**`PUT /projects/:id` does not change status.** The brief says "Update existing project". Status
-moves through `PATCH /projects/:id/status` instead, because changing it also stamps `started_at` or
-`completed_at` and is a separately granted permission. A `status` sent to `PUT` is ignored rather
-than rejected — everything else in the body still applies.
+**`PUT /projects/:id` does not change the status.** The brief says "Update existing project". Status
+goes through `PATCH /projects/:id/status` instead. Keeping it separate means a change to where a
+project sits in its lifecycle is always deliberate rather than a side effect of editing a form. It
+is easy to audit, because those changes come through one place that also records when they happened.
+It is easier to secure, because it has its own permission and can be given to people who should not
+be renaming projects. And if the agency later wants rules about which status can follow which, there
+is one obvious place to put them. A `status` sent to `PUT` is ignored rather than rejected, and the
+rest of the update still applies.
 
-### Data model
+### The data
 
-- **Clients are their own table, not a string on the project.** The brief lists Client Name as a
-  project field. Typing it per project means "Acme Corp" and "acme corp" become two clients and no
-  one can list a client's work. The form takes free text, matches an existing client
-  case- and whitespace-insensitively, and creates one only when the name is new.
-- **No client management screen.** Clients exist only as a by-product of creating a project — a CRUD
-  module for them was not asked for.
-- **Project names are unique per client, not globally.** Two projects called "Website Redesign" under
-  one client is a data-entry mistake; one each for two clients is normal. A name held by a *deleted*
-  project still counts, so restoring it can never produce a duplicate.
-- **Status and Priority are optional; Start Date is required, Due Date is not.** The brief requires
-  Client Name and Project Name, and says Status and Priority must be *valid* — which is a rule about
-  the value, not about it being present. A project being logged before anyone has decided its
-  priority is ordinary.
-- **`started_at` and `completed_at` are stored** when a project moves to In Progress or Completed,
-  with an editable timestamp. Not in the brief's model, but "monitor progress" is its stated purpose
-  and neither the status alone nor `updated_at` answers when work actually began or finished.
-- **Projects carry a `version` counter.** Two managers editing the same project would otherwise mean
-  the second save silently overwrites the first with nobody told. The second save is refused instead.
+- **Clients are their own table, not just text on the project.** The brief lists Client Name as a
+  field of a project. If each project stores its own copy, "Acme Corp" and "acme corp" become two
+  different clients and nobody can list one client's work. The form still takes plain text, matches
+  an existing client whatever the spacing or capitals, and only creates a client when the name is
+  genuinely new.
+- **There is no screen for managing clients.** Clients are created as a side effect of creating a
+  project. A full CRUD section for them was not asked for.
+- **Project names are unique per client, not across the whole system.** Two projects called
+  "Website Redesign" for the same client is almost always a mistake. One for each of two clients is
+  normal. A deleted project still counts, so restoring it cannot create a duplicate.
+- **Status and Priority are optional. Start Date is required, Due Date is not.** The brief requires
+  Client Name and Project Name, and says Status and Priority must be valid. That is a rule about the
+  value when one is given, not a rule that one must be given. Logging a project before anyone has
+  decided its priority is normal.
+- **The app records when work started and finished.** These are not in the brief's list of fields,
+  but the stated purpose is to monitor progress, and neither the status on its own nor the
+  "last updated" timestamp tells you when work actually began or ended.
+- **Every project has a version number.** Without it, two managers editing the same project means the
+  second save quietly overwrites the first and nobody finds out. The second save is refused instead.
 
-### API
+### The API
 
-- **Endpoints are under `/api/v1`,** not at the root. Versioning now costs a path segment; adding it
-  after a consumer exists costs a migration for them.
-- **`GET /projects` is paginated** — 25 per page, `per_page` capped at 100. The brief says "Retrieve
-  all projects"; an unbounded list is fine at nine rows and a self-inflicted outage at fifty
-  thousand. `meta` and `links` make the whole set reachable.
-- **Every endpoint requires authentication and a specific permission.** Authentication is a bonus
-  item in the brief; a single "is logged in" check was extended to six permissions
-  (`projects.view`, `create`, `update-status`, `edit-details`, `delete`, `restore`) because "project
-  managers" and "an agency" imply people with different reach over the same data.
-- **60 requests per minute per user.** Not requested. Token auth means a leaked token replays as fast
-  as the network allows, and every other input in the app is already bounded.
-- **Sort columns come from a whitelist.** `orderBy()` interpolates identifiers rather than binding
-  them, so an unlisted column is a `422` on the API and falls back to the default in the UI.
-- **Token abilities are not scoped.** A token carries all of its owner's permissions. Scoping them
-  without a real integration to model would have been guesswork — stated here so it is a known
-  trade-off rather than a surprise.
+- **Endpoints sit under `/api/v1` rather than at the root.** Adding a version now costs one path
+  segment. Adding one after other people are using the API means breaking their code.
+- **`GET /projects` returns a page at a time**, 25 by default and at most 100. The brief says
+  "Retrieve all projects", which is fine with nine of them and a problem with fifty thousand. The
+  `meta` and `links` in the response let a client walk through the whole set.
+- **Every endpoint needs a login and a specific permission.** The brief lists authentication as a
+  bonus. Rather than a single "is this person logged in" check, there are six permissions, one for
+  each thing you can do to a project. Roles and permissions add accountability, because every action
+  is tied to a named permission and you can see exactly which roles hold it. They also keep the
+  authorization rules in one place instead of scattered through the code, and the same six
+  permissions are used by both the pages and the API, so the two cannot disagree about who is
+  allowed to do what.
+- **60 requests per minute per user.** Not asked for. A token that leaks can be replayed as fast as
+  the network allows, and every other input to the app is already limited.
+- **Sort columns come from a fixed list.** A column name cannot be safely passed into SQL as a
+  parameter, so an unrecognised one returns `422` on the API and falls back to the default order in
+  the UI.
+- **Tokens are not limited to particular abilities.** A token can do everything its owner can. There
+  is no real integration to model yet, so any limits chosen now would be guesses. It is written down
+  here so it is a known trade-off rather than a surprise later.
 
-### Behaviour
+### How it behaves
 
-- **Any status may follow any other.** The brief defines four status values, not a workflow, so no
-  transition is blocked. Because of that, the timestamp rule is symmetric: a project cannot be
-  completed before it started, *nor* started after it was completed.
-- **"All projects" means all live projects.** Deleted ones appear only behind the "include deleted"
-  toggle, or `?with_deleted=1`.
-- **Seeded data.** Three clients with nine projects, and the two accounts above, so the app is not
-  an empty shell on first run. Seeded outside production only.
+- **Any status can follow any other.** The brief lists four statuses, not an order to move through
+  them, so nothing is blocked. That is also why the time check works in both directions: a project
+  cannot be completed before it started, and it cannot be started after it was completed.
+- **"All projects" means all the ones that are not deleted.** Deleted projects only show up when you
+  tick the box in the UI, or send `?with_deleted=1` to the API.
+- **The app comes with sample data**: three clients, nine projects, and the two accounts above, so it
+  is not empty the first time you open it. None of it is seeded in production.
 
-### Scope
+### What was left out
 
-Bonus items **included**: search, filtering by status and priority, sorting, authentication, and
-tests (covering the domain, both surfaces, and the authorization boundary — run `composer test`).
+Included from the bonus list: search, filtering by status and priority, sorting, authentication, and
+tests covering the business logic, both the pages and the API, and who is allowed to do what. Run
+them with `composer test`.
 
-Bonus items **not included**: Docker and deployment. The brief calls for quality over quantity, and
-a Docker path that had not been run end-to-end would have been a liability rather than a feature —
-`composer setup` is the tested route in.
+Left out from the bonus list: Docker and deployment. The brief asks for quality over quantity, and a
+Docker setup nobody had actually run end to end would be more of a liability than a feature.
+`composer setup` is the path that has been tested.
 
 ## Tests and checks
 
@@ -389,8 +399,8 @@ a Docker path that had not been run end-to-end would have been a liability rathe
 composer test
 ```
 
-Runs Pint (formatting), Larastan level 7 (static analysis) and the Pest suite together — the same
-gate used before every commit. Individually:
+This runs Pint (code formatting), Larastan (static analysis at level 7) and the Pest test suite
+together. It is the same check run before every commit. To run them one at a time:
 
 ```bash
 php artisan test --compact
@@ -404,22 +414,22 @@ composer types:check
 | --- | --- |
 | `app/Models` | `Project`, `Client`, `User` |
 | `app/Enums` | `ProjectStatus`, `ProjectPriority` |
-| `app/Validation` | `ProjectRules` — every validation rule, shared by Livewire and the API |
-| `app/Services` | `ProjectService` — the business logic both surfaces call |
-| `app/Livewire/Forms` | Livewire form objects, which authorize and validate |
-| `app/Console/Commands` | `api:token`, which issues an API token for a user |
-| `app/Http/Controllers/Api/V1` | API controllers — thin, delegating to the service |
-| `app/Http/Requests/Api/V1` | Form Requests, each a pass-through to `ProjectRules` |
+| `app/Validation` | `ProjectRules`, every validation rule, shared by the pages and the API |
+| `app/Services` | `ProjectService`, the business logic both of them call |
+| `app/Livewire/Forms` | Livewire form objects, which check permissions and validate |
+| `app/Console/Commands` | `api:token`, which creates an API token for a user |
+| `app/Http/Controllers/Api/V1` | API controllers, kept thin and handing the work to the service |
+| `app/Http/Requests/Api/V1` | Form requests, each one passing through to `ProjectRules` |
 | `app/Http/Resources` | `ProjectResource`, the shape of every API response |
-| `resources/views/pages` | Livewire single-file page components (`⚡name.blade.php`) |
-| `.ai/rules` | Project conventions, scoped to the paths they govern |
+| `resources/views/pages` | Livewire page components (`⚡name.blade.php`) |
+| `.ai/rules` | Project conventions, each scoped to the files it applies to |
 
 ## Documentation
 
-[`docs/api.md`](docs/api.md) is the API reference — every endpoint with every request variant and
-the response it returns.
+[`docs/api.md`](docs/api.md) is the API reference. It covers every endpoint, every request you can
+make, and the response you get back.
 
-[`docs/implementation-plan.md`](docs/implementation-plan.md) is the design record: the data model,
-the architecture and the reasoning behind each decision — why validation lives in one shared class,
-why client creation catches a unique-constraint violation instead of locking, why optimistic locking
-is in scope, and what was deliberately left out.
+[`docs/implementation-plan.md`](docs/implementation-plan.md) is the design record. It covers the data
+model, the structure of the code, and the reasoning behind each decision: why the validation rules
+live in one shared class, how two people creating the same client at the same time is handled, why
+version numbers are there, and what was deliberately left out.
