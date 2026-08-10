@@ -12,11 +12,8 @@ use Livewire\Form;
 use LogicException;
 
 /**
- * The status change form behind the confirmation modal.
- *
- * Status is deliberately not part of ProjectForm: changing it also writes the started_at
- * or completed_at timestamp, which is why it is confirmed separately and carries its own
- * permission.
+ * Separate from ProjectForm because a status change also writes a timestamp, so it is
+ * confirmed on its own and carries its own permission.
  */
 class ProjectStatusForm extends Form
 {
@@ -26,14 +23,9 @@ class ProjectStatusForm extends Form
 
     public string $changed_at = '';
 
-    /**
-     * The version of the project this form was loaded from.
-     */
+    /** Sent back on save so a write lands only if nobody else saved in the meantime. */
     public int $version = 1;
 
-    /**
-     * Fill the form for a project, defaulting the timestamp to now.
-     */
     public function setProject(Project $project): void
     {
         $this->project = $project;
@@ -43,8 +35,8 @@ class ProjectStatusForm extends Form
     }
 
     /**
-     * The bound on changed_at depends on the status being moved to, so the submitted
-     * value is passed through. If it is not a real status the enum rule rejects it.
+     * The changed_at bound depends on the status being moved to, so the submitted value
+     * is passed through unvalidated; the enum rule is what rejects a bad one.
      *
      * @return array<string, list<mixed>>
      */
@@ -53,25 +45,18 @@ class ProjectStatusForm extends Form
         return ProjectRules::status($this->requireProject(), ProjectStatus::tryFrom($this->status ?? ''));
     }
 
-    /**
-     * @return array<string, string>
-     */
+    /** @return array<string, string> */
     public function messages(): array
     {
         return ProjectRules::messages();
     }
 
-    /**
-     * @return array<string, string>
-     */
+    /** @return array<string, string> */
     public function validationAttributes(): array
     {
         return ProjectRules::attributes();
     }
 
-    /**
-     * Apply the status change, stamping the timestamp the new status owns.
-     */
     public function save(): Project
     {
         Gate::authorize('projects.update-status');
@@ -90,9 +75,6 @@ class ProjectStatusForm extends Form
         return $project;
     }
 
-    /**
-     * The project this form was loaded for.
-     */
     private function requireProject(): Project
     {
         return $this->project ?? throw new LogicException('The form has no project; call setProject() first.');

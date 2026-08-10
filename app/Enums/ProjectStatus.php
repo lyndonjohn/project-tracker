@@ -9,9 +9,6 @@ enum ProjectStatus: string
     case OnHold = 'on_hold';
     case Completed = 'completed';
 
-    /**
-     * The human-readable label for this status.
-     */
     public function label(): string
     {
         return match ($this) {

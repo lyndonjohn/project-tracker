@@ -14,19 +14,11 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 
 /**
- * The project business logic, shared by the Livewire UI and the API.
- *
- * Every method receives data that has already been validated by ProjectRules, so nothing
- * here re-checks field shapes; what it does own is client resolution, the status
- * timestamps, and the optimistic-locking guard.
+ * Receives data already validated by ProjectRules, so nothing here re-checks field shapes.
  */
 class ProjectService
 {
     /**
-     * Create a project, creating its client too when the name is new.
-     *
-     * Two tables are written, so the whole thing is one transaction.
-     *
      * @param  array<string, mixed>  $data
      */
     public function create(array $data): Project
@@ -41,11 +33,11 @@ class ProjectService
     }
 
     /**
-     * Update everything about a project except its status.
+     * Updates everything except the status, which moves through updateStatus().
      *
      * @param  array<string, mixed>  $data
      *
-     * @throws StaleProjectException when someone else saved first
+     * @throws StaleProjectException
      */
     public function updateDetails(Project $project, array $data, int $expectedVersion): Project
     {
@@ -63,12 +55,7 @@ class ProjectService
     }
 
     /**
-     * Move a project to a new status, stamping the timestamp that status owns.
-     *
-     * Transitions are unrestricted, so moving away from In Progress or Completed leaves
-     * the timestamp that was already recorded alone.
-     *
-     * @throws StaleProjectException when someone else saved first
+     * @throws StaleProjectException
      */
     public function updateStatus(Project $project, ProjectStatus $status, ?CarbonImmutable $changedAt, int $expectedVersion): Project
     {
@@ -89,9 +76,6 @@ class ProjectService
         return $this->updateGuardedByVersion($project, $values, $expectedVersion);
     }
 
-    /**
-     * Soft-delete a project, recording who did it.
-     */
     public function delete(Project $project, User $deletedBy): void
     {
         Gate::authorize('projects.delete');
@@ -104,9 +88,6 @@ class ProjectService
         });
     }
 
-    /**
-     * Restore a soft-deleted project and forget who deleted it.
-     */
     public function restore(Project $project): Project
     {
         Gate::authorize('projects.restore');
@@ -118,19 +99,9 @@ class ProjectService
     }
 
     /**
-     * Find the client this name refers to, creating it the first time it is seen.
-     *
-     * The lookup goes through the canonical key rather than the name, so casing and
-     * spacing differences resolve to one client instead of quietly creating a second.
-     *
-     * firstOrCreate is a select followed by an insert, so two requests naming the same
-     * new client both miss the select and both insert, and the loser hits the unique
-     * index. A transaction does not help — the conflict is between transactions rather
-     * than inside one. Laravel already resolves this: firstOrCreate defers to
-     * createOrFirst, which wraps the insert in a savepoint, catches
-     * UniqueConstraintViolationException, and re-reads the winning row over the write
-     * connection. Catching it again here would only duplicate that, so the unique index
-     * on clients.name_key is what makes this safe, and the user sees a successful save.
+     * Do not wrap this in a catch for unique violations: firstOrCreate defers to
+     * createOrFirst, which already catches one and re-reads the winner. The unique index
+     * on clients.name_key is what makes concurrent creation of one client safe.
      */
     private function resolveClient(string $name): Client
     {
@@ -141,15 +112,10 @@ class ProjectService
     }
 
     /**
-     * Write the given values only if the project is still on the version the caller loaded.
+     * Zero affected rows means someone else saved first, or deleted the row.
      *
-     * Zero affected rows means someone else saved first — including someone who deleted
-     * the project, since a trashed row is outside this query's scope.
-     *
-     * The update goes through the query builder, so it fires no model events and leaves
-     * the in-memory model holding its old attributes and, more damagingly, its old
-     * version. Refreshing before returning is what keeps the caller's next save from
-     * failing against a version that has already moved.
+     * The refresh() is not optional: a query builder update leaves the in-memory model
+     * holding the old version, which would fail the caller's next save.
      *
      * @param  array<string, mixed>  $values
      *

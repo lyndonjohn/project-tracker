@@ -22,7 +22,7 @@ new #[Title('Edit project')] class extends Component {
     }
 
     /**
-     * Existing client names, offered as suggestions on a field that still takes free text.
+     * Suggestions only — the field still takes free text, which is what creates a client.
      *
      * @return Collection<int, string>
      */
@@ -33,10 +33,8 @@ new #[Title('Edit project')] class extends Component {
     }
 
     /**
-     * Save the changes, unless someone else saved first.
-     *
-     * A stale write leaves the form exactly as the user typed it, so nothing is lost
-     * while they go and look at what changed.
+     * A stale write leaves the form as typed, so nothing is lost while the user goes and
+     * looks at what changed.
      */
     public function save(): void
     {
@@ -88,9 +86,8 @@ new #[Title('Edit project')] class extends Component {
 
         <flux:textarea wire:model="form.description" :label="__('Description')" rows="4" />
 
-        {{-- items-start keeps each field at its natural height. Fields are grids
-             themselves (see app.css), so a stretched one spreads its label, control
-             and error out to fill the row, misaligning it against its neighbour. --}}
+        {{-- items-start: fields are grids themselves (app.css), so a stretched one
+             spreads its label, control and error out and misaligns against its pair. --}}
         <div class="grid items-start gap-6 md:grid-cols-2">
             <flux:select wire:model="form.priority" :label="__('Priority')" :placeholder="__('Not set')">
                 <flux:select.option value="">{{ __('Not set') }}</flux:select.option>

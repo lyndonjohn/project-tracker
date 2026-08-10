@@ -8,9 +8,6 @@ enum ProjectPriority: string
     case Medium = 'medium';
     case High = 'high';
 
-    /**
-     * The human-readable label for this priority.
-     */
     public function label(): string
     {
         return match ($this) {

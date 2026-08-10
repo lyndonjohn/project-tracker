@@ -8,11 +8,7 @@ use Illuminate\Database\Seeder;
 
 class ProjectSeeder extends Seeder
 {
-    /**
-     * The demo clients this seeder creates on a first run.
-     *
-     * @var list<string>
-     */
+    /** @var list<string> */
     public const array CLIENTS = [
         'Acme Corporation',
         'Globex',
@@ -20,10 +16,8 @@ class ProjectSeeder extends Seeder
     ];
 
     /**
-     * Seed a handful of clients, each with a project in a different status.
-     *
-     * Projects are only created alongside a client this run created, so re-running the
-     * seeder never adds a second set to a client that already exists.
+     * Projects are only created alongside a client this run created, so re-running never
+     * adds a second set to a client that already exists.
      */
     public function run(): void
     {

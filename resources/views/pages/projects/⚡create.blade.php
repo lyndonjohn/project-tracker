@@ -16,16 +16,13 @@ use Livewire\Component;
 new #[Title('New project')] class extends Component {
     public ProjectForm $form;
 
-    /**
-     * Today is only a prefill, so the column itself stays honest about what was saved.
-     */
     public function mount(): void
     {
         $this->form->start_date = CarbonImmutable::now()->toDateString();
     }
 
     /**
-     * Existing client names, offered as suggestions on a field that still takes free text.
+     * Suggestions only — the field still takes free text, which is what creates a client.
      *
      * @return Collection<int, string>
      */
@@ -35,9 +32,6 @@ new #[Title('New project')] class extends Component {
         return Client::orderBy('name')->pluck('name');
     }
 
-    /**
-     * Create the project and go back to the list.
-     */
     public function save(): void
     {
         try {
@@ -81,9 +75,8 @@ new #[Title('New project')] class extends Component {
 
         <flux:textarea wire:model="form.description" :label="__('Description')" rows="4" />
 
-        {{-- items-start keeps each field at its natural height. Fields are grids
-             themselves (see app.css), so a stretched one spreads its label, control
-             and error out to fill the row, misaligning it against its neighbour. --}}
+        {{-- items-start: fields are grids themselves (app.css), so a stretched one
+             spreads its label, control and error out and misaligns against its pair. --}}
         <div class="grid items-start gap-6 md:grid-cols-2">
             <flux:select wire:model="form.status" :label="__('Status')" :placeholder="__('Not set')">
                 <flux:select.option value="">{{ __('Not set') }}</flux:select.option>
