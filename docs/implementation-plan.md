@@ -5,7 +5,7 @@
 
 ---
 
-## 1. Current State (facts, verified in the codebase — **as of 2026-08-10, phases 0–7 complete**)
+## 1. Current State (facts, verified in the codebase — **as of 2026-08-10, all phases complete**)
 
 This section is a snapshot, not a decision record: it describes what is on disk today and is refreshed as phases land. Everything below §2 is the plan itself and stays as agreed.
 
@@ -15,7 +15,7 @@ This section is a snapshot, not a decision record: it describes what is on disk 
 - Auth is handled by **Fortify** (session-based web auth, 2FA, passkeys). **Sanctum** 4.3.3 guards the API (phase 7).
 - **spatie/laravel-permission** 8.3.0. Permissions live on roles only; the Super Admin role bypasses all gates via `Gate::before` (check with `can()`, never `hasPermissionTo()` — see `.ai/rules/app.md`).
 - Livewire pages are single-file components in `resources/views/pages/` (`⚡name.blade.php`), routed with `Route::livewire('path', 'pages::name')`.
-- Testing: Pest 5 (`php artisan test --compact`), Pint, Larastan level 7. **223 tests, 609 assertions, all passing.**
+- Testing: Pest 5 (`php artisan test --compact`), Pint, Larastan level 7. **284 tests, 797 assertions, all passing.**
 
 **Permissions and roles** (phase 0)
 
@@ -23,18 +23,26 @@ This section is a snapshot, not a decision record: it describes what is on disk 
 - A **Project Manager** role is seeded with the six project permissions as first-run defaults, applied only on creation and never re-synced (§2.14).
 - The Super Admin role and account carry `is_protected = true` (`roles.is_protected`, `users.is_protected`) — protected records can **never be deleted, not even by a Super Admin**.
 
-**Built (phases 1–7)**
+**Built (phases 1–8)**
 
 - `clients` and `projects` tables, with `name_key`, `version`, soft deletes and the composite unique on (`client_id`, `name`); `Client` / `Project` models, factories, `ProjectSeeder`.
 - `App\Enums\ProjectStatus`, `App\Enums\ProjectPriority`; `App\Validation\ProjectRules`; `App\Services\ProjectService`; `App\Exceptions\StaleProjectException`.
 - `App\Livewire\Forms\ProjectForm` and `ProjectStatusForm`.
 - Pages under `resources/views/pages/projects/` — `⚡index`, `⚡create`, `⚡edit`, `⚡status-modal`; the delete confirmation modal lives in `⚡index`. Routed in `routes/web.php` under `['auth', 'verified']` with `can:` middleware per page.
-- API scaffolding: `routes/api.php`, `config/sanctum.php`, the `personal_access_tokens` migration, `HasApiTokens` on `User`, `throttleApi()` in `bootstrap/app.php` and `RateLimiter::for('api')` in `AppServiceProvider`. The only route in the file is `install:api`'s scaffolded `GET /api/user` (§5.2).
+- API scaffolding: `config/sanctum.php`, the `personal_access_tokens` migration, `HasApiTokens` on `User`, `throttleApi()` in `bootstrap/app.php` and `RateLimiter::for('api')` in `AppServiceProvider`.
+- The `/api/v1` route group in `routes/api.php` — all seven endpoints from §5.2, each behind `auth:sanctum` and its `can:` middleware — with `App\Http\Controllers\Api\V1\*`, the Form Requests under `App\Http\Requests\Api\V1\*` (a shared `ProjectRequest` base plus four rules-only subclasses), and `ProjectResource`. `install:api`'s scaffolded `GET /api/user` is still there alongside them.
+- `Project::listing()`, the query scope the index page and the API list endpoint share (§4.3).
+- `StaleProjectException` → 409 and route-model-binding misses → a `404` that does not name the model class, both registered in `bootstrap/app.php` and scoped to `api/*`.
 
-**Not yet present** (phase 8, the remaining work)
+**Built alongside the plan, not in it**
 
-- The `/api/v1` route group and its controllers (`App\Http\Controllers\Api\V1\*`), the Form Requests, and `ProjectResource`.
-- The `StaleProjectException` → 409 mapping in `bootstrap/app.php` (the exception itself exists and is thrown by the service; nothing renders it as JSON yet).
+- `php artisan api:token {email}` (`App\Console\Commands\IssueApiTokenCommand`) and `DemoUserSeeder`, which seeds a Project Manager account outside production — between them, a way to exercise the API as a user whose permissions actually decide something.
+- `README.md` (setup, running, technology choices, assumptions) and `docs/api.md` (the endpoint-by-endpoint reference, captured from a running instance).
+
+**Not built**
+
+- Docker and deployment: bonus items in the brief, deliberately left out rather than shipped untested.
+- Role and user management screens. The `roles.*` and `users.*` permission slugs are seeded ahead of them (§8.1.7), and the protected-record rule in §2.5 applies whenever they are built.
 
 ## 2. Decisions Already Made (confirmed with the product owner)
 
@@ -546,24 +554,25 @@ Phase 0 is **done** (this commit). Each later step ends green on `vendor/bin/pin
 0. ✅ Seeder + permissions groundwork: projects.update-status rename, projects.restore,
    Project Manager role seeded with projects.*, is_protected on users/roles,
    Super Admin role + account protected
-   → verified: php artisan test --compact tests/Feature/RolePermissionTest.php (10 passed)
-1. Migrations, enums, models, factories, seeders (clients w/ name_key, projects w/ version
+   → verified: php artisan test --compact tests/Feature/RolePermissionTest.php (12 passed)
+1. ✅ Migrations, enums, models, factories, seeders (clients w/ name_key, projects w/ version
    + composite unique on client_id+name)
-   → verify: php artisan test --compact --filter=ProjectModel (casts, soft delete, relationships)
-2. ProjectRules (details/status/listing/messages/attributes + SORTABLE)
-   → verify: php artisan test --compact --filter=ProjectRules
+   → verified: php artisan test --compact --filter=ProjectModel (11 passed — casts, soft
+     delete, relationships)
+2. ✅ ProjectRules (details/status/listing/messages/attributes + SORTABLE)
+   → verified: php artisan test --compact --filter=ProjectRules (32 passed)
      (scoped-unique passes for a same-named project under a different client; sort whitelist
       rejects an unlisted column; per_page cap; message wording)
-3. ProjectService (race-safe client resolution, updateDetails, updateStatus, delete, restore,
+3. ✅ ProjectService (race-safe client resolution, updateDetails, updateStatus, delete, restore,
    StaleProjectException)
-   → verify: php artisan test --compact --filter=ProjectService
-4. Livewire form objects (delegating to ProjectRules + Gate::authorize)
-   → verify: php artisan test --compact --filter=ProjectForm
-5. Livewire pages: index (search/filter/sort/include-deleted/restore), create, edit
-   → verify: php artisan test --compact --filter=ProjectIndex|ProjectCreate|ProjectEdit
-     (assertSee, permission denials, filter results, query-count/N+1, sort tampering)
-6. Status modal + delete modal (confirmations, timestamp defaults, cross-field date rule)
-   → verify: php artisan test --compact --filter=ProjectStatus|ProjectDelete
+   → verified: php artisan test --compact --filter=ProjectService (25 passed)
+4. ✅ Livewire form objects (delegating to ProjectRules + Gate::authorize)
+   → verified: php artisan test --compact --filter=ProjectForm (21 passed)
+5. ✅ Livewire pages: index (search/filter/sort/include-deleted/restore), create, edit
+   → verified: php artisan test --compact --filter=ProjectIndex|ProjectCreate|ProjectEdit
+     (58 passed — assertSee, permission denials, filter results, query-count/N+1, sort tampering)
+6. ✅ Status modal + delete modal (confirmations, timestamp defaults, cross-field date rule)
+   → verified: php artisan test --compact --filter=ProjectStatus|ProjectDelete (23 passed)
 7. ✅ php artisan install:api (approved) — Sanctum, routes/api.php, the api: entry in
    withRouting, personal_access_tokens migration; HasApiTokens on User; throttleApi()
    in bootstrap/app.php AND RateLimiter::for('api') in AppServiceProvider, which moved
@@ -572,12 +581,18 @@ Phase 0 is **done** (this commit). Each later step ends green on `vendor/bin/pin
    → verified: php artisan test --compact tests/Feature/ApiScaffoldingTest.php (9 passed)
      route:list CANNOT verify the middleware stack — it prints the unexpanded group name
      ('api'), never its members, so the once-and-only-once check is a test (§9).
-8. API v1: Form Requests (thin ProjectRules wrappers), ProjectResource, controllers,
-   can: middleware, StaleProjectException → 409
-   → verify: php artisan test --compact --filter=Api
+8. ✅ API v1: Form Requests (thin ProjectRules wrappers), ProjectResource, controllers,
+   can: middleware, StaleProjectException → 409. Three things the plan did not call for but
+   the build needed: ProjectRules::version(), because only the API validates the locking
+   counter (a form object holds it as a property); a ProjectRequest base class, so the four
+   requests differ only in rules(); and Project::listing(), a scope holding the search,
+   filters, sort and eager load that the index page previously kept inline — §4.3 called for
+   a shared query builder, and the API list endpoint is the second caller that made it one.
+   → verified: php artisan test --compact --filter=Api (68 passed)
      (auth 401, permission 403, validation 422, conflict 409, throttled 429,
       JSON error body without an Accept header, happy paths per endpoint)
-9. Full suite: composer test (pint + phpstan + pest)
+9. ✅ Full suite: composer test (pint + phpstan + pest)
+   → verified: composer test — pint passed, phpstan 0 errors, 284 tests / 797 assertions passed
 ```
 
 ### Test coverage highlights
