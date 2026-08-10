@@ -106,6 +106,10 @@ A versioned JSON API covering everything the UI does. The Livewire pages do not 
 talk to the server over Livewire's own protocol — so the two surfaces share the service and
 validation layers rather than one calling the other.
 
+**[`docs/api.md`](docs/api.md) is the full reference** — every endpoint, every parameter, every
+request variant and the exact response it returns, captured from a running instance. What follows
+here is the short version: how to get a token and make your first call.
+
 ### Authenticating
 
 Requests carry a Sanctum bearer token. There is no token endpoint — tokens are issued from the
@@ -309,6 +313,9 @@ composer types:check
 | `.ai/rules` | Project conventions, scoped to the paths they govern |
 
 ## Documentation
+
+[`docs/api.md`](docs/api.md) is the API reference — every endpoint with every request variant and
+the response it returns.
 
 [`docs/implementation-plan.md`](docs/implementation-plan.md) is the design record: the data model,
 the architecture and the reasoning behind each decision — why validation lives in one shared class,

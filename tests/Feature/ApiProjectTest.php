@@ -429,6 +429,34 @@ test('a project can be deleted and restored', function () {
         ->and($restored->deleted_by)->toBeNull();
 });
 
+test('a due date range applies only when both bounds are given', function () {
+    apiUserWith('projects.view');
+    apiProject(['name' => 'Due Soon', 'due_date' => '2026-03-01']);
+    apiProject(['name' => 'Due Late', 'due_date' => '2027-03-01']);
+
+    expect($this->getJson('/api/v1/projects?due_from=2026-01-01&due_to=2026-12-31')->json('data.*.name'))
+        ->toBe(['Due Soon']);
+
+    // One bound alone is not half a range — it is no range, as documented in docs/api.md.
+    expect($this->getJson('/api/v1/projects?due_from=2026-01-01')->json('data.*.name'))
+        ->toEqualCanonicalizing(['Due Soon', 'Due Late']);
+
+    expect($this->getJson('/api/v1/projects?due_to=2026-12-31')->json('data.*.name'))
+        ->toEqualCanonicalizing(['Due Soon', 'Due Late']);
+});
+
+test('restoring a project that is not deleted succeeds and changes nothing', function () {
+    apiUserWith('projects.restore');
+    $project = apiProject(['name' => 'Still Here']);
+
+    $this->postJson("/api/v1/projects/{$project->id}/restore")
+        ->assertOk()
+        ->assertJsonPath('data.name', 'Still Here')
+        ->assertJsonMissingPath('data.deleted_at');
+
+    expect($project->fresh()->trashed())->toBeFalse();
+});
+
 test('the api and the ui create a project under the same rules', function () {
     Client::factory()->named('Acme Corp')->create();
 
