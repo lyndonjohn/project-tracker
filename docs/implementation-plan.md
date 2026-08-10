@@ -5,18 +5,36 @@
 
 ---
 
-## 1. Current State (facts, verified in the codebase)
+## 1. Current State (facts, verified in the codebase — **as of 2026-08-10, phases 0–7 complete**)
 
-- Laravel 13 (`laravel/framework ^13.17`), PHP 8.5, Livewire 4 starter kit with Flux UI 2.
-- Auth is handled by **Fortify** (session-based web auth, 2FA, passkeys).
-- **spatie/laravel-permission** is installed. Permissions live on roles only; the Super Admin role bypasses all gates via `Gate::before` (check with `can()`, never `hasPermissionTo()` — see `.ai/rules/app.md`).
-- Project permissions seeded in `RolePermissionSeeder::PERMISSIONS`:
-  `projects.view`, `projects.create`, `projects.update-status`, `projects.edit-details`, `projects.delete`, `projects.restore`.
-- A **Project Manager** role is seeded with all `projects.*` permissions.
-- The Super Admin role and account carry `is_protected = true` (`roles.is_protected`, `users.is_protected`) — protected records can **never be deleted, not even by a Super Admin**.
+This section is a snapshot, not a decision record: it describes what is on disk today and is refreshed as phases land. Everything below §2 is the plan itself and stays as agreed.
+
+**Platform**
+
+- Laravel 13 (`laravel/framework` 13.24.0), PHP 8.5.8, Livewire 4 (4.3.5) starter kit with Flux UI 2 (2.15.1).
+- Auth is handled by **Fortify** (session-based web auth, 2FA, passkeys). **Sanctum** 4.3.3 guards the API (phase 7).
+- **spatie/laravel-permission** 8.3.0. Permissions live on roles only; the Super Admin role bypasses all gates via `Gate::before` (check with `can()`, never `hasPermissionTo()` — see `.ai/rules/app.md`).
 - Livewire pages are single-file components in `resources/views/pages/` (`⚡name.blade.php`), routed with `Route::livewire('path', 'pages::name')`.
-- Testing: Pest 5 (`php artisan test --compact`), Pint, Larastan.
-- **Not yet present:** `Project`/`Client` models, `routes/api.php`, Sanctum (approved — installed in Phase 6).
+- Testing: Pest 5 (`php artisan test --compact`), Pint, Larastan level 7. **223 tests, 609 assertions, all passing.**
+
+**Permissions and roles** (phase 0)
+
+- `RolePermissionSeeder::PERMISSIONS` holds the six project slugs — `projects.view`, `projects.create`, `projects.update-status`, `projects.edit-details`, `projects.delete`, `projects.restore` — alongside `roles.*` and `users.*` slugs seeded for future modules that have no feature behind them yet.
+- A **Project Manager** role is seeded with the six project permissions as first-run defaults, applied only on creation and never re-synced (§2.14).
+- The Super Admin role and account carry `is_protected = true` (`roles.is_protected`, `users.is_protected`) — protected records can **never be deleted, not even by a Super Admin**.
+
+**Built (phases 1–7)**
+
+- `clients` and `projects` tables, with `name_key`, `version`, soft deletes and the composite unique on (`client_id`, `name`); `Client` / `Project` models, factories, `ProjectSeeder`.
+- `App\Enums\ProjectStatus`, `App\Enums\ProjectPriority`; `App\Validation\ProjectRules`; `App\Services\ProjectService`; `App\Exceptions\StaleProjectException`.
+- `App\Livewire\Forms\ProjectForm` and `ProjectStatusForm`.
+- Pages under `resources/views/pages/projects/` — `⚡index`, `⚡create`, `⚡edit`, `⚡status-modal`; the delete confirmation modal lives in `⚡index`. Routed in `routes/web.php` under `['auth', 'verified']` with `can:` middleware per page.
+- API scaffolding: `routes/api.php`, `config/sanctum.php`, the `personal_access_tokens` migration, `HasApiTokens` on `User`, `throttleApi()` in `bootstrap/app.php` and `RateLimiter::for('api')` in `AppServiceProvider`. The only route in the file is `install:api`'s scaffolded `GET /api/user` (§5.2).
+
+**Not yet present** (phase 8, the remaining work)
+
+- The `/api/v1` route group and its controllers (`App\Http\Controllers\Api\V1\*`), the Form Requests, and `ProjectResource`.
+- The `StaleProjectException` → 409 mapping in `bootstrap/app.php` (the exception itself exists and is thrown by the service; nothing renders it as JSON yet).
 
 ## 2. Decisions Already Made (confirmed with the product owner)
 
