@@ -10,42 +10,26 @@ use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Unique;
 
 /**
- * Every validation rule for projects, defined exactly once.
- *
- * Livewire form objects extend Livewire\Form and Form Requests extend FormRequest, so
- * neither can inherit from the other. Both call this class instead, which keeps the web
- * UI and the API from drifting apart the first time a rule is edited.
+ * Livewire form objects and API Form Requests are bound to incompatible base classes, so
+ * this is the only place a rule can be defined once for both.
  */
 final class ProjectRules
 {
     /**
-     * The columns a project list may be sorted by.
-     *
-     * orderBy() interpolates identifiers rather than binding them, so a sort column must
-     * come from a fixed list. Both surfaces validate against this one constant, so a new
-     * sortable column cannot be enabled on one of them and not the other.
-     *
-     * "client_name" is not a column on projects — Project::sorted() maps it to the
-     * client's name. It is listed here because this is what both surfaces validate
-     * against, and that scope is where every entry is turned into an ordering.
+     * orderBy() interpolates identifiers rather than binding them, so a sort column has to
+     * come from a fixed list. Project::sorted() turns each entry here into an ordering,
+     * including "client_name", which is not a column on projects.
      *
      * @var list<string>
      */
     public const array SORTABLE = ['name', 'client_name', 'due_date', 'status', 'priority', 'created_at'];
 
-    /**
-     * The directions a project list may be sorted in.
-     *
-     * @var list<string>
-     */
+    /** @var list<string> */
     public const array DIRECTIONS = ['asc', 'desc'];
 
     /**
-     * Rules for creating and editing a project.
-     *
-     * Pass the project being edited so the unique rule ignores itself. Status is only
-     * accepted on create — it is changed through the status modal and its endpoint after
-     * that, because those also write the started_at / completed_at timestamps.
+     * Pass the project being edited so the unique rule ignores itself. Status is accepted
+     * on create only; after that it moves through status(), which also stamps a timestamp.
      *
      * @return array<string, list<mixed>>
      */
@@ -68,15 +52,11 @@ final class ProjectRules
     }
 
     /**
-     * Rules for a status change.
+     * The changed_at bound is symmetric because transitions are unrestricted, so either
+     * timestamp can be the one being written and the other the one to stay behind.
      *
-     * The bound on changed_at is symmetric because the invariant is
-     * "completed_at >= started_at" and transitions are unrestricted, so either timestamp
-     * can be the one being written. Each bound only applies when the other timestamp is
-     * already stored, so a project that has never been completed moves freely.
-     *
-     * The target status is read from the unvalidated input; when it is not a real status
-     * no bound is added and the enum rule below rejects the request anyway.
+     * $target is unvalidated input; a value that is not a status adds no bound and is
+     * rejected by the enum rule below.
      *
      * @return array<string, list<mixed>>
      */
@@ -98,11 +78,7 @@ final class ProjectRules
         ];
     }
 
-    /**
-     * Rules for the query parameters of a project list, on both surfaces.
-     *
-     * @return array<string, list<mixed>>
-     */
+    /** @return array<string, list<mixed>> */
     public static function listing(): array
     {
         return [
@@ -118,11 +94,7 @@ final class ProjectRules
         ];
     }
 
-    /**
-     * Message overrides for the rules whose stock wording leaks schema detail or reads awkwardly.
-     *
-     * @return array<string, string>
-     */
+    /** @return array<string, string> */
     public static function messages(): array
     {
         return [
@@ -133,11 +105,7 @@ final class ProjectRules
         ];
     }
 
-    /**
-     * Field labels, so messages read "client name" rather than "client name field".
-     *
-     * @return array<string, string>
-     */
+    /** @return array<string, string> */
     public static function attributes(): array
     {
         return [
@@ -153,20 +121,11 @@ final class ProjectRules
     }
 
     /**
-     * A project name must be unique within its client, not globally.
+     * Keep the scalar where(): a closure does not serialize into the rule string, so a
+     * test comparing the two surfaces' rules would stop covering the client scoping.
      *
-     * The client is resolved through the same canonical key the service uses, so a name
-     * typed with different casing or spacing scopes to the client it will actually be
-     * saved against. For a brand-new client there is no id to scope to, the rule matches
-     * no rows, and it passes — correct, since a new client owns no projects yet.
-     *
-     * The scalar where() form is deliberate: a closure would not serialize into the rule
-     * string, so a test comparing the two surfaces' rules would silently stop covering
-     * the client scoping.
-     *
-     * Soft-deleted projects are included on purpose. A trashed project still holds its
-     * name, and letting a live duplicate through would corrupt the index the moment
-     * someone restored it.
+     * Soft-deleted projects count. A trashed project still holds its name, so allowing a
+     * live duplicate would break the index the moment someone restored it.
      */
     private static function uniqueNamePerClient(?string $clientName, ?Project $project): Unique
     {

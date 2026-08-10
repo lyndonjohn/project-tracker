@@ -24,21 +24,15 @@ class Client extends Model
     use HasFactory;
 
     /**
-     * The canonical match key for a client name.
-     *
-     * Defined here, on the model that owns the column, so the service and the validation
-     * layer cannot end up with two definitions that disagree about casing or whitespace.
+     * The one definition of the canonical key, so the service and the validation layer
+     * cannot disagree about casing or whitespace.
      */
     public static function keyFor(string $name): string
     {
         return Str::lower(Str::squish($name));
     }
 
-    /**
-     * The projects belonging to this client.
-     *
-     * @return HasMany<Project, $this>
-     */
+    /** @return HasMany<Project, $this> */
     public function projects(): HasMany
     {
         return $this->hasMany(Project::class);

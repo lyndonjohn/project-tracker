@@ -39,11 +39,8 @@ class Project extends Model
     use HasFactory, SoftDeletes;
 
     /**
-     * The model's default attribute values.
-     *
-     * The database defaults "version" to 1, but a freshly created model does not re-read
-     * the row, so without this the optimistic-locking counter would be null in memory
-     * right after a create and the first edit would have no version to send back.
+     * Mirrors the column default: a freshly created model does not re-read the row, so
+     * without this the version would be null in memory right after a create.
      *
      * @var array<string, mixed>
      */
@@ -51,33 +48,21 @@ class Project extends Model
         'version' => 1,
     ];
 
-    /**
-     * The client this project belongs to.
-     *
-     * @return BelongsTo<Client, $this>
-     */
+    /** @return BelongsTo<Client, $this> */
     public function client(): BelongsTo
     {
         return $this->belongsTo(Client::class);
     }
 
-    /**
-     * The user who soft-deleted this project.
-     *
-     * @return BelongsTo<User, $this>
-     */
+    /** @return BelongsTo<User, $this> */
     public function deletedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'deleted_by');
     }
 
     /**
-     * Order a project list by one of the whitelisted sort columns.
-     *
-     * Both the index page and the API list endpoint order through here, so a sortable
-     * column means the same thing on both. Anything outside the whitelist falls back to
-     * the default rather than reaching orderBy(), which interpolates identifiers rather
-     * than binding them.
+     * The whitelist guard belongs here, not only in the callers: orderBy() interpolates
+     * identifiers rather than binding them.
      *
      * @param  Builder<Project>  $query
      */
