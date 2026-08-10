@@ -108,6 +108,59 @@ deleted by anyone.
 
 **API.** The same features over JSON at `/api/v1`, ready for a future frontend. See [API](#api).
 
+## Validation
+
+These are the rules for creating and updating a project. They are written once, in
+`app/Validation/ProjectRules.php`, and used by both the pages and the API, so a project saved
+through the UI and one sent to the API are held to exactly the same standard. There is no second
+copy to fall out of step.
+
+| Field | Rules |
+| --- | --- |
+| Client Name | Required. Text, up to 255 characters. |
+| Project Name | Required. Text, up to 255 characters, and not already used by that client. |
+| Description | Optional. Any length. |
+| Status | Optional, and must be one of `planning`, `in_progress`, `on_hold`, `completed`. Only accepted when creating. |
+| Priority | Optional, and must be one of `low`, `medium`, `high`. |
+| Start Date | Required. Must be a real date. |
+| Due Date | Optional. Must be a real date, and on or after the Start Date. |
+
+A few of these are worth spelling out:
+
+- **The project name only has to be unique for its client.** Two clients can each have a "Website
+  Redesign". Asking the same client for a second one is refused, and so is reusing the name of a
+  project that client has deleted, because restoring that project would then create a duplicate.
+- **Status and Priority are checked against the list of allowed values**, so a typo or an
+  invented value is rejected rather than saved.
+- **Due Date is compared against the Start Date in the same request**, so the two are always
+  consistent with each other.
+- **Editing does not accept a Status.** That happens through the status screen, which has its own
+  rules: the status must be a valid one, and the time you give it cannot be earlier than when the
+  project started or later than when it was completed.
+
+### What you see when something is wrong
+
+In the UI, the message appears under the field it belongs to and nothing is saved. The wording is
+written for the person reading it, not copied from the database. Asking a client for a project name
+they already have says:
+
+> This client already has a project with that name. If it was deleted, restore that project instead
+> of creating a new one.
+
+The API returns `422` with the same messages, listed by field, so a client can show them next to its
+own inputs:
+
+```json
+{
+  "message": "The client name field is required. (and 2 more errors)",
+  "errors": {
+    "client_name": ["The client name field is required."],
+    "name": ["The name field is required."],
+    "start_date": ["The start date field is required."]
+  }
+}
+```
+
 ## Technology choices
 
 | Choice | Why |
