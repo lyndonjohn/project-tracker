@@ -211,6 +211,29 @@ test('an unknown project is a json 404 even without an accept header', function 
         ->assertHeader('Content-Type', 'application/json');
 });
 
+test('a 404 does not name the model class', function (string $method, string $uri) {
+    apiUserWith('projects.view', 'projects.edit-details', 'projects.delete', 'projects.restore');
+
+    $response = $this->json($method, $uri, ['name' => 'x', 'client_name' => 'y', 'start_date' => '2026-01-01', 'version' => 1])
+        ->assertNotFound()
+        ->assertExactJson(['message' => 'Not found.']);
+
+    expect($response->content())->not->toContain('App\\Models');
+})->with([
+    'show' => ['get', '/api/v1/projects/9999'],
+    'update' => ['put', '/api/v1/projects/9999'],
+    'delete' => ['delete', '/api/v1/projects/9999'],
+    'restore' => ['post', '/api/v1/projects/9999/restore'],
+    'an unrouted api path' => ['get', '/api/v1/nothing-here'],
+]);
+
+test('a missing web page is unaffected and still renders html', function () {
+    $this->actingAs(User::factory()->create())
+        ->get('/no-such-page')
+        ->assertNotFound()
+        ->assertHeader('Content-Type', 'text/html; charset=UTF-8');
+});
+
 test('a project can be created, and its client with it', function () {
     apiUserWith('projects.create');
 
