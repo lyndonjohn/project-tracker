@@ -365,6 +365,10 @@ RateLimiter::for('api', fn (Request $request) => Limit::perMinute(60)
     ->by($request->user()?->id ?: $request->ip()));
 ```
 
+**The two ship together or the API is broken.** The dependency runs both ways, and the second direction is the harsher one: `throttleApi()` only writes the *string* `throttle:api` onto the group, so without a matching `RateLimiter::for('api', …)` the middleware finds no named limiter, falls through to treating `"api"` as a max-attempts value, and throws `MissingRateLimiterException` — a 500 on every authenticated API request (`ThrottleRequests::resolveMaxAttempts()`, lines 207–211). Nothing in the framework supplies that limiter: the 60/min everyone remembers lived in `RouteServiceProvider::configureRateLimiting()`, which the skeleton dropped in Laravel 11 and never replaced, and `grep` over `illuminate/` finds no `RateLimiter::for(` at all. Verified on 13.24.0 — `app(RateLimiter::class)->limiter('api')` returns `null` on a stock install. This is why the limiter landed in phase 7 alongside `throttleApi()` rather than in phase 8 (§9).
+
+A guest request will *not* reveal this: `Authenticate` sorts ahead of `ThrottleRequests` in the framework's middleware priority list, so an unauthenticated call is refused with a clean 401 before the throttle is ever reached. The 500 only appears once a request authenticates — which is also why the guest-side IP bucket is asserted against the limiter closure rather than through a route (§9).
+
 **60 requests/minute, keyed on the user.** Keying on the user rather than the IP matters: several staff behind one office NAT would otherwise share a single bucket and throttle each other. The IP fallback keeps unauthenticated requests from being used to probe. A limit isn't a nice-to-have here — token auth means a leaked token can be replayed as fast as the network allows, and every other surface in this plan (sort whitelist, page-size cap, authorization) is already accounted for; an unbounded request rate would be the one gap left. 60/min sits well above human-driven UI use while capping automated abuse; revise once a real integration's traffic shape is known.
 
 **No `ForceJsonResponse` middleware.** An earlier draft of this plan proposed one. It is unnecessary — `bootstrap/app.php` already carries:
@@ -386,6 +390,8 @@ Every route here is under `/api/v1`, so `is('api/*')` matches and the framework 
 | PATCH | `/api/v1/projects/{project}/status` | Update status | `projects.update-status` |
 | DELETE | `/api/v1/projects/{project}` | Soft delete | `projects.delete` |
 | POST | `/api/v1/projects/{project}/restore` | Restore | `projects.restore` |
+
+Phase 7 also left `install:api`'s scaffolded `GET /api/user` in place — it is not part of this table, and it is what the phase's middleware and token tests currently exercise. **Phase 8 decides its fate:** keep it (harmless, `auth:sanctum`-guarded, and the conventional way a token consumer identifies itself) or delete it, in which case the four route-level assertions in `ApiScaffoldingTest` need repointing at a `/api/v1` route.
 
 ### 5.3 API structure
 
@@ -540,14 +546,16 @@ Phase 0 is **done** (this commit). Each later step ends green on `vendor/bin/pin
      (assertSee, permission denials, filter results, query-count/N+1, sort tampering)
 6. Status modal + delete modal (confirmations, timestamp defaults, cross-field date rule)
    → verify: php artisan test --compact --filter=ProjectStatus|ProjectDelete
-7. composer require laravel/sanctum + php artisan install:api (approved),
-   then enable throttleApi() in bootstrap/app.php
-   → verify: php artisan route:list --path=api — confirm the middleware column shows
-     throttle:api ONCE and SubstituteBindings ONCE. Two throttle entries means 'api'
-     was listed on the route group as well; none means throttleApi() is missing (§5.2).
+7. ✅ php artisan install:api (approved) — Sanctum, routes/api.php, the api: entry in
+   withRouting, personal_access_tokens migration; HasApiTokens on User; throttleApi()
+   in bootstrap/app.php AND RateLimiter::for('api') in AppServiceProvider, which moved
+   here from phase 8 because throttle:api without a defined limiter is a 500 on every
+   authenticated request, not merely an unthrottled one (§5.2)
+   → verified: php artisan test --compact tests/Feature/ApiScaffoldingTest.php (9 passed)
+     route:list CANNOT verify the middleware stack — it prints the unexpanded group name
+     ('api'), never its members, so the once-and-only-once check is a test (§9).
 8. API v1: Form Requests (thin ProjectRules wrappers), ProjectResource, controllers,
-   throttleApi() in bootstrap + RateLimiter::for('api') + can: middleware,
-   StaleProjectException → 409
+   can: middleware, StaleProjectException → 409
    → verify: php artisan test --compact --filter=Api
      (auth 401, permission 403, validation 422, conflict 409, throttled 429,
       JSON error body without an Accept header, happy paths per endpoint)
@@ -583,8 +591,10 @@ Phase 0 is **done** (this commit). Each later step ends green on `vendor/bin/pin
 
 **API transport**
 - A request with **no `Accept` header** to a nonexistent project returns a JSON 404, not an HTML page — pinning the existing `shouldRenderJsonWhen` guarantee so a later edit to `bootstrap/app.php` can't silently drop it.
-- The middleware stack on an API route is what's intended — `php artisan route:list --path=api` shows `throttle:api` exactly **once** and `SubstituteBindings` exactly once (§5.2).
-- Exceeding the rate limit returns 429 with a `Retry-After` header; two different users do not share a bucket (the NAT case), while two unauthenticated requests from one IP do.
+- The middleware stack on every API route is what's intended — `throttle:api` exactly **once** and `SubstituteBindings` exactly once (§5.2). Asserted by walking each `api/*` route through `Router::gatherRouteMiddleware()`, which resolves the group into its members. `route:list --path=api -v` is not the check: it prints the group *name* and nothing inside it, so two `throttle` entries and zero would look identical there. The test iterates whatever routes the file holds, so it keeps covering the v1 endpoints added in phase 8.
+- A named `api` limiter is defined at all — a one-line guard against the §5.2 failure, since every other API test would pass with `throttleApi()` removed but only this one fails if the limiter is.
+- Exceeding the rate limit returns 429 with a `Retry-After` header, and two different users do not share a bucket (the NAT case) — asserted through real requests.
+- The guest bucket keys on the IP — asserted by **invoking the limiter closure directly**, not through a route. It cannot be observed through the middleware: `Authenticate` sorts ahead of `ThrottleRequests` in the framework's priority list, so an unauthenticated request is refused with a 401 before the limiter increments anything (§5.2).
 
 **Performance**
 - Index query count is constant regardless of row count (eager-loaded `client`), asserted with `DB::listen` at 1 vs 20 projects.
