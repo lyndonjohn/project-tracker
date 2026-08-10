@@ -4,7 +4,7 @@ Project management for staff and project managers — create projects against a 
 and priority, and soft-delete or restore them. Built with Laravel 13, Livewire 4 and Flux UI, with
 role-based permissions throughout and a JSON API for future frontends.
 
-## Requirements
+## Prerequisites
 
 Install these first. `composer setup` uses them; it does not install them.
 
@@ -45,15 +45,21 @@ composer setup
 7. `npm install` — downloads this project's Node packages into `node_modules/`
 8. `npm run build` — compiles the CSS and JavaScript
 
-Then serve it:
+## Running the application
 
 ```bash
 composer dev
 ```
 
 The app is then at **http://localhost:8000**, with the Vite dev server, a queue listener and a log
-tail running alongside it. If you use [Laravel Herd](https://herd.laravel.com), the site is already
-served at `http://project-tracker.test` and you only need `npm run dev` for asset hot-reloading.
+tail running alongside it. Stop it with `Ctrl-C`.
+
+If you use [Laravel Herd](https://herd.laravel.com), the site is already served at
+`http://project-tracker.test` and you only need `npm run dev` for asset hot-reloading. Run
+`herd secure` if you want it over HTTPS.
+
+Log in with one of the accounts below, then go to **Projects** in the sidebar. The API is at
+`/api/v1` — see [API](#api).
 
 ## Logging in
 
@@ -99,6 +105,25 @@ passes every check through a `Gate::before` bypass. Both the Super Admin role an
 flagged protected and can never be deleted, by anyone.
 
 **API** — the same features over JSON at `/api/v1`, for a future frontend. See [API](#api) below.
+
+## Technology choices
+
+| Choice | Why |
+| --- | --- |
+| **Laravel 13** (PHP 8.5) | One of the permitted backend options, and the one whose batteries — Eloquent, validation, policies/gates, queues, first-party auth — cover most of this brief without third-party glue. |
+| **Livewire 4 + Flux UI 2** | The UI is server-rendered from the same PHP that owns the rules, so validation and authorization exist once instead of being restated in a client. See the note below on the frontend options. |
+| **SQLite** | Permitted, and the only option that needs no server: `composer setup` creates a file and the app runs. The code is driver-agnostic — see the due-date note in `Project::listing()` for a place where that was deliberate. |
+| **Fortify** | First-party authentication (login, registration, password reset, 2FA, passkeys) without hand-rolling it, and headless, so it does not dictate the UI. |
+| **spatie/laravel-permission** | Roles and permissions are the standard solution here; writing a fifth-rate version of it would not have been a better use of the time. |
+| **Sanctum** | Token auth for the API. First-party, and it covers both futures — bearer tokens for a separate frontend, cookie auth for a same-domain SPA — without OAuth2's machinery, which nothing here needs. |
+| **Pest 5, Pint, Larastan (level 7)** | Tests, formatting and static analysis, all runnable as one `composer test`. |
+
+**On the frontend options.** The brief lists React, Vue, Angular and Next.js. This uses Livewire,
+which is Laravel's own server-rendered component layer, because splitting a CRUD app across two
+codebases would have meant maintaining the validation and permission rules twice — the single
+biggest source of drift in an app this shape. The JSON API is built and documented precisely so a
+React or Vue frontend can be added later without touching the domain layer: it already covers every
+feature the UI has.
 
 ## API
 
@@ -280,6 +305,83 @@ Errors are JSON regardless of the `Accept` header, since every route here is und
   "errors": { "sort": ["The selected sort is invalid."] }
 }
 ```
+
+## Assumptions
+
+Decisions the [brief](https://github.com/koda-devteam-ops/fullstack-developer-assessment/blob/main/REQUIREMENTS.md)
+did not specify. Two of them change how a listed endpoint behaves, so they lead.
+
+### Two deviations worth knowing about first
+
+**`DELETE /projects/:id` soft-deletes.** The brief says "Delete project". The row is marked deleted,
+records who deleted it, and can be restored; it is gone from every default list and the API returns
+`404` for it afterwards, so a consumer sees a delete. It is still in the table. Losing a client's
+project history to one mis-click seemed the worse failure, and restoring costs two columns and a
+route.
+
+**`PUT /projects/:id` does not change status.** The brief says "Update existing project". Status
+moves through `PATCH /projects/:id/status` instead, because changing it also stamps `started_at` or
+`completed_at` and is a separately granted permission. A `status` sent to `PUT` is ignored rather
+than rejected — everything else in the body still applies.
+
+### Data model
+
+- **Clients are their own table, not a string on the project.** The brief lists Client Name as a
+  project field. Typing it per project means "Acme Corp" and "acme corp" become two clients and no
+  one can list a client's work. The form takes free text, matches an existing client
+  case- and whitespace-insensitively, and creates one only when the name is new.
+- **No client management screen.** Clients exist only as a by-product of creating a project — a CRUD
+  module for them was not asked for.
+- **Project names are unique per client, not globally.** Two projects called "Website Redesign" under
+  one client is a data-entry mistake; one each for two clients is normal. A name held by a *deleted*
+  project still counts, so restoring it can never produce a duplicate.
+- **Status and Priority are optional; Start Date is required, Due Date is not.** The brief requires
+  Client Name and Project Name, and says Status and Priority must be *valid* — which is a rule about
+  the value, not about it being present. A project being logged before anyone has decided its
+  priority is ordinary.
+- **`started_at` and `completed_at` are stored** when a project moves to In Progress or Completed,
+  with an editable timestamp. Not in the brief's model, but "monitor progress" is its stated purpose
+  and neither the status alone nor `updated_at` answers when work actually began or finished.
+- **Projects carry a `version` counter.** Two managers editing the same project would otherwise mean
+  the second save silently overwrites the first with nobody told. The second save is refused instead.
+
+### API
+
+- **Endpoints are under `/api/v1`,** not at the root. Versioning now costs a path segment; adding it
+  after a consumer exists costs a migration for them.
+- **`GET /projects` is paginated** — 25 per page, `per_page` capped at 100. The brief says "Retrieve
+  all projects"; an unbounded list is fine at nine rows and a self-inflicted outage at fifty
+  thousand. `meta` and `links` make the whole set reachable.
+- **Every endpoint requires authentication and a specific permission.** Authentication is a bonus
+  item in the brief; a single "is logged in" check was extended to six permissions
+  (`projects.view`, `create`, `update-status`, `edit-details`, `delete`, `restore`) because "project
+  managers" and "an agency" imply people with different reach over the same data.
+- **60 requests per minute per user.** Not requested. Token auth means a leaked token replays as fast
+  as the network allows, and every other input in the app is already bounded.
+- **Sort columns come from a whitelist.** `orderBy()` interpolates identifiers rather than binding
+  them, so an unlisted column is a `422` on the API and falls back to the default in the UI.
+- **Token abilities are not scoped.** A token carries all of its owner's permissions. Scoping them
+  without a real integration to model would have been guesswork — stated here so it is a known
+  trade-off rather than a surprise.
+
+### Behaviour
+
+- **Any status may follow any other.** The brief defines four status values, not a workflow, so no
+  transition is blocked. Because of that, the timestamp rule is symmetric: a project cannot be
+  completed before it started, *nor* started after it was completed.
+- **"All projects" means all live projects.** Deleted ones appear only behind the "include deleted"
+  toggle, or `?with_deleted=1`.
+- **Seeded data.** Three clients with nine projects, and the two accounts above, so the app is not
+  an empty shell on first run. Seeded outside production only.
+
+### Scope
+
+Bonus items **included**: search, filtering by status and priority, sorting, authentication, and
+tests (covering the domain, both surfaces, and the authorization boundary — run `composer test`).
+
+Bonus items **not included**: Docker and deployment. The brief calls for quality over quantity, and
+a Docker path that had not been run end-to-end would have been a liability rather than a feature —
+`composer setup` is the tested route in.
 
 ## Tests and checks
 
