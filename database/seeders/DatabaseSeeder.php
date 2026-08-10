@@ -19,6 +19,7 @@ class DatabaseSeeder extends Seeder
         $this->call(RolePermissionSeeder::class);
 
         if (! app()->isProduction()) {
+            $this->call(DemoUserSeeder::class);
             $this->call(ProjectSeeder::class);
         }
     }
