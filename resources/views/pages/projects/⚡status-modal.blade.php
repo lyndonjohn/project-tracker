@@ -73,7 +73,13 @@ new class extends Component {
             @endif
         </div>
 
+        {{-- A project may have no status yet, so null needs an option of its own. Not
+             flux:select's placeholder prop: it renders the option disabled, and a browser
+             will not hold a disabled option selected, so it falls through to the first
+             real status while the bound value stays null — the form then looks filled in
+             and fails validation on save. --}}
         <flux:select wire:model.live="form.status" :label="__('Status')">
+            <flux:select.option value="">{{ __('Choose a status') }}</flux:select.option>
             @foreach (ProjectStatus::cases() as $case)
                 <flux:select.option value="{{ $case->value }}">{{ $case->label() }}</flux:select.option>
             @endforeach
