@@ -73,19 +73,19 @@ new #[Title('New project')] class extends Component {
 
         <flux:input wire:model="form.name" :label="__('Project name')" required />
 
-        <flux:textarea wire:model="form.description" :label="__('Description')" rows="4" />
+        <flux:textarea wire:model="form.description" :label="__('Description')" :badge="__('Optional')" rows="4" />
 
         {{-- items-start: fields are grids themselves (app.css), so a stretched one
              spreads its label, control and error out and misaligns against its pair. --}}
         <div class="grid items-start gap-6 md:grid-cols-2">
-            <flux:select wire:model="form.status" :label="__('Status')" :placeholder="__('Not set')">
+            <flux:select wire:model="form.status" :label="__('Status')" :badge="__('Optional')">
                 <flux:select.option value="">{{ __('Not set') }}</flux:select.option>
                 @foreach (ProjectStatus::cases() as $case)
                     <flux:select.option value="{{ $case->value }}">{{ $case->label() }}</flux:select.option>
                 @endforeach
             </flux:select>
 
-            <flux:select wire:model="form.priority" :label="__('Priority')" :placeholder="__('Not set')">
+            <flux:select wire:model="form.priority" :label="__('Priority')" :badge="__('Optional')">
                 <flux:select.option value="">{{ __('Not set') }}</flux:select.option>
                 @foreach (ProjectPriority::cases() as $case)
                     <flux:select.option value="{{ $case->value }}">{{ $case->label() }}</flux:select.option>
@@ -94,7 +94,7 @@ new #[Title('New project')] class extends Component {
 
             <flux:input wire:model="form.start_date" type="date" :label="__('Start date')" required />
 
-            <flux:input wire:model="form.due_date" type="date" :label="__('Due date')" />
+            <flux:input wire:model="form.due_date" type="date" :label="__('Due date')" :badge="__('Optional')" />
         </div>
 
         <div class="flex items-center gap-4">

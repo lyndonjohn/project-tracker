@@ -44,6 +44,13 @@ test('a user with the create permission sees the form', function () {
         ->assertSee('Project name');
 });
 
+test('exactly the optional fields are labelled optional', function () {
+    actingAsCreator('projects.view', 'projects.create');
+
+    expect(labelsMarkedOptional(Livewire::test('pages::projects.create')->html()))
+        ->toEqualCanonicalizing(['Description', 'Status', 'Priority', 'Due date']);
+});
+
 test('the start date is prefilled with today', function () {
     actingAsCreator('projects.view', 'projects.create');
 
