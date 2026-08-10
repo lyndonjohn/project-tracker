@@ -78,6 +78,20 @@ final class ProjectRules
         ];
     }
 
+    /**
+     * The optimistic-locking counter, which only the API validates: a Livewire form holds
+     * it as a property loaded from the model, while an API client has to send back the
+     * version it read or the write cannot be checked for staleness at all.
+     *
+     * @return array<string, list<mixed>>
+     */
+    public static function version(): array
+    {
+        return [
+            'version' => ['required', 'integer', 'min:1'],
+        ];
+    }
+
     /** @return array<string, list<mixed>> */
     public static function listing(): array
     {

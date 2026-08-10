@@ -5,10 +5,8 @@ use App\Enums\ProjectStatus;
 use App\Models\Project;
 use App\Services\ProjectService;
 use App\Validation\ProjectRules;
-use Carbon\CarbonImmutable;
 use Flux\Flux;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
@@ -155,32 +153,22 @@ new #[Title('Projects')] class extends Component {
     }
 
     /**
-     * The client is eager-loaded because every row renders its name.
-     *
      * @return LengthAwarePaginator<int, Project>
      */
     #[Computed]
     public function projects(): LengthAwarePaginator
     {
         return Project::query()
-            ->with('client')
-            ->when($this->with_deleted, fn (Builder $query) => $query->withTrashed())
-            ->when($this->search !== '', fn (Builder $query) => $query->where(
-                fn (Builder $query) => $query
-                    ->where('projects.name', 'like', "%{$this->search}%")
-                    ->orWhere('description', 'like', "%{$this->search}%")
-                    ->orWhereHas('client', fn (Builder $client) => $client->where('name', 'like', "%{$this->search}%")),
-            ))
-            ->when($this->status, fn (Builder $query) => $query->where('status', $this->status))
-            ->when($this->priority, fn (Builder $query) => $query->where('priority', $this->priority))
-            // Bounded by the whole day because MySQL stores a date column as
-            // "2026-03-15" and SQLite as "2026-03-15 00:00:00", so the bare date would
-            // drop rows due on the "to" date under SQLite. Keeps the due_date index,
-            // which whereDate() would lose.
-            ->when($this->due_from && $this->due_to, fn (Builder $query) => $query
-                ->where('due_date', '>=', CarbonImmutable::parse($this->due_from)->startOfDay())
-                ->where('due_date', '<=', CarbonImmutable::parse($this->due_to)->endOfDay()))
-            ->sorted($this->sort, $this->direction)
+            ->listing([
+                'search' => $this->search,
+                'status' => $this->status,
+                'priority' => $this->priority,
+                'due_from' => $this->due_from,
+                'due_to' => $this->due_to,
+                'sort' => $this->sort,
+                'direction' => $this->direction,
+                'with_deleted' => $this->with_deleted,
+            ])
             ->paginate($this->per_page);
     }
 
@@ -190,7 +178,7 @@ new #[Title('Projects')] class extends Component {
      *
      * This is not the sort guard — Project::sorted() is, and it has to stay there even
      * if this goes away. What only this prevents is "?per_page=100000" paginating the
-     * whole table, and a non-date reaching CarbonImmutable::parse() above.
+     * whole table, and a non-date reaching the date parsing in Project::listing().
      */
     private function discardInvalidListingState(?string $property = null): void
     {
