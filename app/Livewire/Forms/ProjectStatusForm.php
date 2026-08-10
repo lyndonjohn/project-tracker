@@ -30,7 +30,7 @@ class ProjectStatusForm extends Form
     {
         $this->project = $project;
         $this->status = $project->status?->value;
-        $this->changed_at = CarbonImmutable::now()->format('Y-m-d H:i:s');
+        $this->changed_at = CarbonImmutable::now()->format('Y-m-d\TH:i');
         $this->version = $project->version;
     }
 
