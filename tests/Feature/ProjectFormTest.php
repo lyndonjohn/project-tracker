@@ -230,7 +230,7 @@ test('the status form defaults to the current status and now', function () {
 
     hostComponent($project)
         ->assertSet('statusForm.status', ProjectStatus::Planning->value)
-        ->assertSet('statusForm.changed_at', now()->format('Y-m-d H:i:s'))
+        ->assertSet('statusForm.changed_at', now()->format('Y-m-d\TH:i'))
         ->assertSet('statusForm.version', 1);
 });
 

@@ -9,9 +9,11 @@ use Carbon\CarbonImmutable;
 use Flux\Flux;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\On;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -46,6 +48,10 @@ new #[Title('Projects')] class extends Component {
 
     #[Url]
     public int $per_page = 25;
+
+    public bool $show_delete = false;
+
+    public ?int $deleting = null;
 
     public function mount(): void
     {
@@ -86,6 +92,47 @@ new #[Title('Projects')] class extends Component {
     {
         $this->reset('search', 'status', 'priority', 'due_from', 'due_to', 'with_deleted');
         $this->resetPage();
+    }
+
+    public function confirmDelete(int $project): void
+    {
+        $this->deleting = $project;
+        $this->show_delete = true;
+    }
+
+    public function deleteProject(): void
+    {
+        Gate::authorize('projects.delete');
+
+        try {
+            app(ProjectService::class)->delete(
+                Project::findOrFail($this->deleting),
+                Auth::user(),
+            );
+        } catch (Throwable $exception) {
+            report($exception);
+
+            Flux::toast(variant: 'danger', text: __('Something went wrong. Please try again.'));
+
+            return;
+        }
+
+        $this->reset('deleting', 'show_delete');
+        unset($this->projects);
+
+        Flux::toast(variant: 'success', text: __('Project deleted.'));
+    }
+
+    #[Computed]
+    public function deletingProject(): ?Project
+    {
+        return $this->deleting === null ? null : Project::find($this->deleting);
+    }
+
+    #[On('project-updated')]
+    public function refreshList(): void
+    {
+        unset($this->projects);
     }
 
     public function restore(int $project): void
@@ -258,11 +305,24 @@ new #[Title('Projects')] class extends Component {
                                         variant="ghost"
                                         icon="arrow-uturn-left"
                                         wire:click="restore({{ $project->id }})"
+                                        data-test="restore-button"
                                     >
                                         {{ __('Restore') }}
                                     </flux:button>
                                 @endcan
                             @else
+                                @can('projects.update-status')
+                                    <flux:button
+                                        size="sm"
+                                        variant="ghost"
+                                        icon="flag"
+                                        wire:click="$dispatch('change-project-status', { project: {{ $project->id }} })"
+                                        data-test="status-button"
+                                    >
+                                        {{ __('Status') }}
+                                    </flux:button>
+                                @endcan
+
                                 @can('projects.edit-details')
                                     <flux:button
                                         size="sm"
@@ -272,6 +332,18 @@ new #[Title('Projects')] class extends Component {
                                         wire:navigate
                                     >
                                         {{ __('Edit') }}
+                                    </flux:button>
+                                @endcan
+
+                                @can('projects.delete')
+                                    <flux:button
+                                        size="sm"
+                                        variant="ghost"
+                                        icon="trash"
+                                        wire:click="confirmDelete({{ $project->id }})"
+                                        data-test="delete-button"
+                                    >
+                                        {{ __('Delete') }}
                                     </flux:button>
                                 @endcan
                             @endif
@@ -285,4 +357,28 @@ new #[Title('Projects')] class extends Component {
             @endforelse
         </flux:table.rows>
 </flux:table>
+
+    <flux:modal wire:model.self="show_delete" class="md:w-96">
+        <div class="flex flex-col gap-6">
+            <div>
+                <flux:heading size="lg">{{ __('Delete project?') }}</flux:heading>
+
+                @if ($this->deletingProject)
+                    <flux:text class="mt-2">
+                        {{ __('":name" will be removed from the list. You can restore it later.', ['name' => $this->deletingProject->name]) }}
+                    </flux:text>
+                @endif
+            </div>
+
+            <div class="flex justify-end gap-3">
+                <flux:modal.close>
+                    <flux:button variant="ghost">{{ __('Cancel') }}</flux:button>
+                </flux:modal.close>
+
+                <flux:button variant="danger" wire:click="deleteProject">{{ __('Delete project') }}</flux:button>
+            </div>
+        </div>
+    </flux:modal>
+
+    <livewire:pages::projects.status-modal />
 </div>
