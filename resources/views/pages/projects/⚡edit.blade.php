@@ -89,16 +89,16 @@ new #[Title('Edit project')] class extends Component {
         {{-- items-start: fields are grids themselves (app.css), so a stretched one
              spreads its label, control and error out and misaligns against its pair. --}}
         <div class="grid items-start gap-6 md:grid-cols-2">
+            <flux:input wire:model="form.start_date" type="date" :label="__('Start date')" required />
+
+            <flux:input wire:model="form.due_date" type="date" :label="__('Due date')" :badge="__('Optional')" />
+
             <flux:select wire:model="form.priority" :label="__('Priority')" :badge="__('Optional')">
                 <flux:select.option value="">{{ __('Not set') }}</flux:select.option>
                 @foreach (ProjectPriority::cases() as $case)
                     <flux:select.option value="{{ $case->value }}">{{ $case->label() }}</flux:select.option>
                 @endforeach
             </flux:select>
-
-            <flux:input wire:model="form.start_date" type="date" :label="__('Start date')" required />
-
-            <flux:input wire:model="form.due_date" type="date" :label="__('Due date')" :badge="__('Optional')" />
         </div>
 
         <div class="flex items-center gap-4">
