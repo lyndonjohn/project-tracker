@@ -57,18 +57,24 @@ served at `http://project-tracker.test` and you only need `npm run dev` for asse
 
 ## Logging in
 
-The seeder creates a Super Admin account from the `SUPER_ADMIN_*` values in `.env`:
+Seeding creates two accounts, both with the password `password`:
 
-| Email | Password |
-| --- | --- |
-| `superadmin@example.com` | `password` |
+| Email | Role | Use it to |
+| --- | --- | --- |
+| `superadmin@example.com` | Super Admin | See everything — this account passes **every** permission check through a `Gate::before` bypass |
+| `pm@example.com` | Project Manager | Exercise the app as a normally-permissioned user, where permissions actually decide things |
 
-**These are local development defaults.** Set real values through the environment anywhere this is
-deployed — the seeder creates the account only when both variables are present, so leaving them
-unset in production is safe.
+Prefer `pm@example.com` when you want to see the authorization behave. Because the Super Admin
+bypasses every gate, nothing it does can ever produce a 403, which makes the permission checks look
+like they do nothing.
+
+**Both are local development defaults.** The Super Admin comes from the `SUPER_ADMIN_*` values in
+`.env`, so set real ones through the environment anywhere this is deployed — the seeder creates that
+account only when both variables are present. The Project Manager is seeded **only outside
+production**, alongside the sample projects.
 
 Registering a new account through the UI gets you a user with **no role**, which by design cannot
-reach the project pages. Grant that user a role, or use the Super Admin account above.
+reach the project pages — useful for seeing a refusal firsthand.
 
 ## What's in it
 
@@ -102,12 +108,28 @@ validation layers rather than one calling the other.
 
 ### Authenticating
 
-Requests carry a Sanctum bearer token. There is no token endpoint; issue one for a user from the
-console:
+Requests carry a Sanctum bearer token. There is no token endpoint — tokens are issued from the
+console, for any user:
 
 ```bash
-php artisan tinker --execute 'echo App\Models\User::where("email", "superadmin@example.com")->sole()->createToken("my-integration")->plainTextToken;'
+php artisan api:token pm@example.com
 ```
+
+It prints the user, the roles the token will therefore carry, and the token itself. Sanctum stores
+only a hash, so that plain text is shown once and cannot be recovered afterwards — copy it when it
+appears. Pass `--name` to label one (`php artisan api:token pm@example.com --name=postman`) so it
+can be revoked without affecting the others.
+
+### Trying it in Postman
+
+1. Run `php artisan api:token pm@example.com` and copy the token it prints.
+2. In Postman, set the request's **Authorization** type to **Bearer Token** and paste it — or add the
+   header by hand as `Authorization: Bearer <token>`.
+3. Add an `Accept: application/json` header.
+4. `GET http://project-tracker.test/api/v1/projects`
+
+Issue a token for `superadmin@example.com` to watch every endpoint succeed, and one for an account
+with fewer permissions to watch the same request come back `403`.
 
 ```bash
 curl -H "Authorization: Bearer <token>" -H "Accept: application/json" http://project-tracker.test/api/v1/projects
@@ -279,6 +301,7 @@ composer types:check
 | `app/Validation` | `ProjectRules` — every validation rule, shared by Livewire and the API |
 | `app/Services` | `ProjectService` — the business logic both surfaces call |
 | `app/Livewire/Forms` | Livewire form objects, which authorize and validate |
+| `app/Console/Commands` | `api:token`, which issues an API token for a user |
 | `app/Http/Controllers/Api/V1` | API controllers — thin, delegating to the service |
 | `app/Http/Requests/Api/V1` | Form Requests, each a pass-through to `ProjectRules` |
 | `app/Http/Resources` | `ProjectResource`, the shape of every API response |
