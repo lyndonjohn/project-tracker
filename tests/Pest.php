@@ -48,3 +48,19 @@ function something()
 {
     // ..
 }
+
+/**
+ * The field labels in the given HTML that carry Flux's "Optional" badge.
+ *
+ * @return list<string>
+ */
+function labelsMarkedOptional(string $html): array
+{
+    preg_match_all('/<ui-label\b[^>]*>(.*?)<\/ui-label>/s', $html, $labels);
+
+    return collect($labels[1])
+        ->filter(fn (string $label) => str_contains($label, 'Optional'))
+        ->map(fn (string $label) => trim(str_replace('Optional', '', strip_tags($label))))
+        ->values()
+        ->all();
+}

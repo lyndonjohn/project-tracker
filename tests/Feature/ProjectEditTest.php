@@ -59,6 +59,15 @@ test('the edit page is filled with the project it opens', function () {
         ->assertSet('form.version', 1);
 });
 
+test('exactly the optional fields are labelled optional', function () {
+    actingAsEditor('projects.view', 'projects.edit-details');
+    $project = Project::factory()->create();
+
+    $html = Livewire::test('pages::projects.edit', ['project' => $project])->html();
+
+    expect(labelsMarkedOptional($html))->toEqualCanonicalizing(['Description', 'Priority', 'Due date']);
+});
+
 test('the edit page never offers a status field', function () {
     actingAsEditor('projects.view', 'projects.edit-details');
     $project = Project::factory()->inProgress()->create();
