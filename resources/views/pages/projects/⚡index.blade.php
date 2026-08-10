@@ -47,18 +47,11 @@ new #[Title('Projects')] class extends Component {
     #[Url]
     public int $per_page = 25;
 
-    /**
-     * Every listing property is bound to the query string, so all of them arrive
-     * user-controlled — not just the ones a select normally supplies.
-     */
     public function mount(): void
     {
         $this->discardInvalidListingState();
     }
 
-    /**
-     * Re-check a listing property after it changes, and go back to page one.
-     */
     public function updated(string $property): void
     {
         if (array_key_exists($property, ProjectRules::listing())) {
@@ -68,11 +61,8 @@ new #[Title('Projects')] class extends Component {
     }
 
     /**
-     * Sort by a column, or fall back to the default if the column is not sortable.
-     *
-     * The column reaches orderBy(), which interpolates identifiers rather than binding
-     * them, so anything outside the whitelist is discarded. A tampered request renders
-     * the default list rather than erroring at a user who did not cause it.
+     * An unsortable column falls back to the default rather than erroring, since a
+     * tampered request is not something the user can act on.
      */
     public function sortBy(string $column): void
     {
@@ -92,18 +82,12 @@ new #[Title('Projects')] class extends Component {
         $this->resetPage();
     }
 
-    /**
-     * Clear the search and every filter, leaving the chosen sort in place.
-     */
     public function resetFilters(): void
     {
         $this->reset('search', 'status', 'priority', 'due_from', 'due_to', 'with_deleted');
         $this->resetPage();
     }
 
-    /**
-     * Restore a soft-deleted project.
-     */
     public function restore(int $project): void
     {
         Gate::authorize('projects.restore');
@@ -124,10 +108,7 @@ new #[Title('Projects')] class extends Component {
     }
 
     /**
-     * The current page of projects.
-     *
-     * The client is eager-loaded because every row renders its name; without it a
-     * twenty-five row page would issue twenty-six queries.
+     * The client is eager-loaded because every row renders its name.
      *
      * @return LengthAwarePaginator<int, Project>
      */
@@ -145,15 +126,10 @@ new #[Title('Projects')] class extends Component {
             ))
             ->when($this->status, fn (Builder $query) => $query->where('status', $this->status))
             ->when($this->priority, fn (Builder $query) => $query->where('priority', $this->priority))
-            // The range only applies once both ends are set, so a half-filled range does
-            // not start hiding rows while the user is still picking the second date.
-            //
-            // Each end is widened to the whole day rather than compared against the bare
-            // date. MySQL stores a date column as "2026-03-15", SQLite as
-            // "2026-03-15 00:00:00", so comparing against the bare date would drop rows
-            // due on the "to" date under SQLite. The wider bounds are right on both, and
-            // still use the due_date index — whereDate() would wrap the column in a
-            // function and lose it.
+            // Bounded by the whole day because MySQL stores a date column as
+            // "2026-03-15" and SQLite as "2026-03-15 00:00:00", so the bare date would
+            // drop rows due on the "to" date under SQLite. Keeps the due_date index,
+            // which whereDate() would lose.
             ->when($this->due_from && $this->due_to, fn (Builder $query) => $query
                 ->where('due_date', '>=', CarbonImmutable::parse($this->due_from)->startOfDay())
                 ->where('due_date', '<=', CarbonImmutable::parse($this->due_to)->endOfDay()))
@@ -162,12 +138,12 @@ new #[Title('Projects')] class extends Component {
     }
 
     /**
-     * Reset any listing state that fails its rule back to that property's default.
+     * Reset any listing state that fails its rule back to that property's default, so a
+     * stale bookmark renders a list rather than an error nobody typed their way into.
      *
-     * These are navigational state rather than a form being filled in, so a stale
-     * bookmark or a tampered URL shows a sensible list instead of a validation message
-     * the user cannot act on. validateOnly() throws on failure, which is what the catch
-     * turns into the reset.
+     * This is not the sort guard — Project::sorted() is, and it has to stay there even
+     * if this goes away. What only this prevents is "?per_page=100000" paginating the
+     * whole table, and a non-date reaching CarbonImmutable::parse() above.
      */
     private function discardInvalidListingState(?string $property = null): void
     {
@@ -196,9 +172,8 @@ new #[Title('Projects')] class extends Component {
     </div>
 
     <flux:card class="flex flex-col gap-4">
-        {{-- items-start keeps each field at its natural height. Fields are grids
-             themselves (see app.css), so a stretched one spreads its label and control
-             out to fill the row, misaligning it against its neighbours. --}}
+        {{-- items-start: fields are grids themselves (app.css), so a stretched one
+             spreads its label and control out and misaligns against its neighbours. --}}
         <div class="grid items-start gap-4 md:grid-cols-2 xl:grid-cols-6">
             <div class="xl:col-span-2">
                 <flux:input
