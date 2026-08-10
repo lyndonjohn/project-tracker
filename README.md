@@ -344,11 +344,43 @@ rest of the update still applies.
   Client Name and Project Name, and says Status and Priority must be valid. That is a rule about the
   value when one is given, not a rule that one must be given. Logging a project before anyone has
   decided its priority is normal.
-- **The app records when work started and finished.** These are not in the brief's list of fields,
-  but the stated purpose is to monitor progress, and neither the status on its own nor the
-  "last updated" timestamp tells you when work actually began or ended.
-- **Every project has a version number.** Without it, two managers editing the same project means the
-  second save quietly overwrites the first and nobody finds out. The second save is refused instead.
+
+### Three columns the brief does not list
+
+The brief's purpose is to "track client projects, monitor progress, and manage priorities". Three
+columns were added because the fields it does list cannot answer the questions that come with that.
+
+**`started_at` and `completed_at` — when work actually happened.**
+
+Start Date and Due Date are the plan: what someone intended when the project was set up. They never
+change on their own, so on their own they cannot tell you how the work really went. `started_at` is
+recorded when a project moves to In Progress, and `completed_at` when it moves to Completed.
+
+With both, a manager can answer the questions the plan alone leaves open:
+
+- Did this project start when we said it would, or two weeks late?
+- Did it finish before its due date or after it?
+- How long did it actually take, and how does that compare with similar projects?
+- Which projects have genuinely been worked on, and which have only ever been planned?
+
+The status field cannot stand in for this, because it only tells you where a project is now, not
+when it got there. Neither can `updated_at`, because that moves every time anyone edits anything,
+including fixing a typo in the description. The time is editable when you change the status, so
+someone updating the tracker on Monday can record that work actually started on Friday.
+
+**`version` — so tracked information is not quietly lost.**
+
+Tracking is only useful if the record is right. Without this column, two managers opening the same
+project means the second one to save overwrites the first, and nothing anywhere shows that it
+happened. The first manager's update is simply gone, and the project now shows something nobody
+agreed on.
+
+Each project carries a number that goes up by one each time its details or status are saved. When you
+read a project you get its current number, and you send that number back when you save. If it still
+matches, your change is written. If someone else saved in the meantime, your save is refused: the UI
+keeps what you typed and tells you to reload, and the API returns `409` along with the current number
+so a client can read the project again, merge its change in and retry. Nothing is overwritten without
+someone being told.
 
 ### The API
 
