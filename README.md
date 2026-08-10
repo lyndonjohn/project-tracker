@@ -6,10 +6,25 @@ role-based permissions throughout and a JSON API for future frontends.
 
 ## Requirements
 
-- PHP 8.5
-- Composer
-- Node.js 20.19+ or 22.12+ (Vite 8)
-- SQLite (the default; no server to configure)
+Install these first. `composer setup` uses them; it does not install them.
+
+| | Version | Check with |
+| --- | --- | --- |
+| PHP | **8.5 or newer** | `php -v` |
+| Composer | 2.x | `composer --version` |
+| Node.js | 20.19+ or 22.12+ (Vite 8) | `node -v` |
+
+SQLite is the default database and needs no server — the setup command creates the file.
+
+**PHP 8.5 is a hard requirement**, declared as `"php": "^8.5"` in `composer.json`. On anything older,
+`composer install` refuses to run rather than installing a broken tree:
+
+```
+laravel/livewire-starter-kit dev-main requires php (^8.5)
+```
+
+[Laravel Herd](https://herd.laravel.com) is the quickest way to get it on macOS or Windows — it
+bundles PHP, so installing Herd covers the first row of the table.
 
 ## Setup
 
@@ -19,9 +34,16 @@ cd project-tracker
 composer setup
 ```
 
-`composer setup` installs the PHP and Node dependencies, writes `.env`, generates the app key,
-creates the SQLite database, runs the migrations, seeds roles, permissions and sample projects,
-and builds the frontend assets.
+`composer setup` runs these steps, in order:
+
+1. `composer install` — downloads this project's PHP packages into `vendor/`
+2. copies `.env.example` to `.env`, unless you already have one
+3. creates the empty database file at `database/database.sqlite`
+4. `php artisan key:generate` — writes `APP_KEY` into `.env`
+5. `php artisan migrate` — creates the tables
+6. `php artisan db:seed` — roles, permissions, the Super Admin account, and sample projects
+7. `npm install` — downloads this project's Node packages into `node_modules/`
+8. `npm run build` — compiles the CSS and JavaScript
 
 Then serve it:
 
@@ -31,7 +53,7 @@ composer dev
 
 The app is then at **http://localhost:8000**, with the Vite dev server, a queue listener and a log
 tail running alongside it. If you use [Laravel Herd](https://herd.laravel.com), the site is already
-served at `https://project-tracker.test` and you only need `npm run dev` for asset hot-reloading.
+served at `http://project-tracker.test` and you only need `npm run dev` for asset hot-reloading.
 
 ## Logging in
 
