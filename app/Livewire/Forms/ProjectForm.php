@@ -43,6 +43,13 @@ class ProjectForm extends Form
         $this->version = $project->version;
     }
 
+    /**
+     * The optional fields, which a select or a cleared input hands back as "".
+     *
+     * @var list<string>
+     */
+    private const array NULLABLE = ['description', 'status', 'priority', 'due_date'];
+
     /** @return array<string, list<mixed>> */
     public function rules(): array
     {
@@ -69,6 +76,8 @@ class ProjectForm extends Form
     {
         Gate::authorize('projects.create');
 
+        $this->blankOptionalsToNull();
+
         return app(ProjectService::class)->create($this->validate());
     }
 
@@ -79,6 +88,8 @@ class ProjectForm extends Form
     {
         Gate::authorize('projects.edit-details');
 
+        $this->blankOptionalsToNull();
+
         $project = app(ProjectService::class)->updateDetails(
             $this->project ?? throw new LogicException('The form has no project to update; call setProject() first.'),
             $this->validate(),
@@ -88,5 +99,22 @@ class ProjectForm extends Form
         $this->setProject($project);
 
         return $project;
+    }
+
+    /**
+     * Treat a blank optional field as absent, the way ConvertEmptyStringsToNull does for
+     * HTTP requests — Livewire properties never pass through that middleware.
+     *
+     * This is not cosmetic. Laravel skips non-implicit rules for a blank string
+     * (Validator::presentOrRuleIsImplicit), so "" walks past nullable+Rule::enum and only
+     * fails later, in the enum cast, as a ValueError the user sees as a generic failure.
+     */
+    private function blankOptionalsToNull(): void
+    {
+        foreach (self::NULLABLE as $property) {
+            if ($this->{$property} === '') {
+                $this->{$property} = null;
+            }
+        }
     }
 }

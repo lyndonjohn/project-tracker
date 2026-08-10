@@ -94,6 +94,50 @@ test('the form creates a project and its client', function () {
         ->and($project->version)->toBe(1);
 });
 
+test('an optional field left blank is saved as absent, not as an empty string', function () {
+    actingAsUserGranted('projects.create');
+
+    hostComponent()
+        ->set('form.client_name', 'Acme Corp')
+        ->set('form.name', 'Website Redesign')
+        ->set('form.start_date', '2026-01-15')
+        ->set('form.description', '')
+        ->set('form.status', '')
+        ->set('form.priority', '')
+        ->set('form.due_date', '')
+        ->call('store')
+        ->assertHasNoErrors();
+
+    $project = Project::sole();
+
+    expect($project->description)->toBeNull()
+        ->and($project->status)->toBeNull()
+        ->and($project->priority)->toBeNull()
+        ->and($project->due_date)->toBeNull();
+});
+
+test('clearing an optional field on edit blanks it rather than failing', function () {
+    actingAsUserGranted('projects.edit-details');
+    $project = Project::factory()->create([
+        'description' => 'Something',
+        'priority' => ProjectPriority::High,
+        'due_date' => '2026-03-01',
+    ]);
+
+    hostComponent($project)
+        ->set('form.description', '')
+        ->set('form.priority', '')
+        ->set('form.due_date', '')
+        ->call('update')
+        ->assertHasNoErrors();
+
+    $project->refresh();
+
+    expect($project->description)->toBeNull()
+        ->and($project->priority)->toBeNull()
+        ->and($project->due_date)->toBeNull();
+});
+
 test('the form reports validation errors instead of throwing', function () {
     actingAsUserGranted('projects.create');
 
