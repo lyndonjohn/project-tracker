@@ -110,8 +110,12 @@ php artisan tinker --execute 'echo App\Models\User::where("email", "superadmin@e
 ```
 
 ```bash
-curl -H "Authorization: Bearer <token>" -H "Accept: application/json" https://project-tracker.test/api/v1/projects
+curl -H "Authorization: Bearer <token>" -H "Accept: application/json" http://project-tracker.test/api/v1/projects
 ```
+
+The examples below use `http://project-tracker.test`, which is what Herd serves until you run
+`herd secure`. Swap in whatever host and scheme you serve the app on — `http://localhost:8000` under
+`composer dev`, or `https://` once the site is secured. Nothing in the API depends on which.
 
 A token acts as its owner and carries **all** of that user's permissions — abilities are not scoped
 yet. Treat one as equivalent to the owner's password, and issue a separate token per integration so
@@ -156,7 +160,7 @@ whitelist in particular is what keeps user input out of `orderBy()`.
 
 ```bash
 curl -H "Authorization: Bearer <token>" -H "Accept: application/json" \
-  'https://project-tracker.test/api/v1/projects?search=acme&status=in_progress&sort=due_date&direction=asc&per_page=25'
+  'http://project-tracker.test/api/v1/projects?search=acme&status=in_progress&sort=due_date&direction=asc&per_page=25'
 ```
 
 ```json
@@ -193,7 +197,7 @@ projects.
 ```bash
 curl -X POST -H "Authorization: Bearer <token>" -H "Content-Type: application/json" -H "Accept: application/json" \
   -d '{"client_name":"Initech","name":"Intranet","priority":"high","start_date":"2026-09-01","due_date":"2026-12-01"}' \
-  https://project-tracker.test/api/v1/projects
+  http://project-tracker.test/api/v1/projects
 ```
 
 `client_name` is free text: an existing client is matched case- and whitespace-insensitively, and an
@@ -207,7 +211,7 @@ carries its own permission:
 ```bash
 curl -X PATCH -H "Authorization: Bearer <token>" -H "Content-Type: application/json" -H "Accept: application/json" \
   -d '{"status":"in_progress","changed_at":"2026-09-02 09:30:00","version":1}' \
-  https://project-tracker.test/api/v1/projects/8/status
+  http://project-tracker.test/api/v1/projects/8/status
 ```
 
 Moving to In Progress stamps `started_at`, and to Completed stamps `completed_at`, using
