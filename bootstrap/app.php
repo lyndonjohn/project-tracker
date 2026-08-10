@@ -6,6 +6,7 @@ use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -21,6 +22,15 @@ return Application::configure(basePath: dirname(__DIR__))
         $exceptions->shouldRenderJsonWhen(
             fn (Request $request) => $request->is('api/*') || $request->expectsJson(),
         );
+
+        // Route model binding turns a miss into a 404 whose message names the model class —
+        // "No query results for model [App\Models\Project] 99999". That is internal shape
+        // the caller has no use for, so the API answers with the status and nothing else.
+        // By this point the framework has already converted ModelNotFoundException, which
+        // is why this catches the HTTP exception rather than the Eloquent one.
+        $exceptions->render(fn (NotFoundHttpException $exception, Request $request) => $request->is('api/*')
+            ? response()->json(['message' => 'Not found.'], Response::HTTP_NOT_FOUND)
+            : null);
 
         // 409 rather than 422: the payload was valid, the row simply moved on. The current
         // version comes back so a client can re-read, merge and retry without guessing.

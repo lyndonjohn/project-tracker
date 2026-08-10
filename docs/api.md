@@ -117,7 +117,7 @@ none. A client reading `project.status.value` must check the key exists first.
 | --- | --- | --- |
 | `401` | No valid token | `{"message": "Unauthenticated."}` |
 | `403` | Token valid, owner lacks the permission | `{"message": "This action is unauthorized."}` |
-| `404` | No such project, or it is deleted and the route excludes deleted ones | `{"message": "No query results for model [App\\Models\\Project] 99999"}` |
+| `404` | No such project, or it is deleted and the route excludes deleted ones | `{"message": "Not found."}` |
 | `409` | Version conflict | `{"message": "...", "version": 2}` |
 | `422` | Validation failed | `message` plus `errors` keyed by field |
 | `429` | Rate limited | `{"message": "Too Many Attempts."}` |
