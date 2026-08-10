@@ -46,6 +46,41 @@ test('opening the modal fills the form from the project', function () {
         ->assertSee('Website Redesign');
 });
 
+test('a project with no status shows a placeholder rather than one it does not have', function () {
+    actingAsStatusChanger('projects.update-status');
+    $project = Project::factory()->create(['status' => null]);
+
+    statusModal($project)
+        ->assertSet('form.status', null)
+        ->assertSee('Choose a status')
+        ->assertDontSeeHtml('disabled selected');
+});
+
+test('the empty status option is selectable, so the browser can match a null status', function () {
+    actingAsStatusChanger('projects.update-status');
+    $project = Project::factory()->create(['status' => null]);
+
+    preg_match_all('/<option[^>]*>/', statusModal($project)->html(), $options);
+
+    $empty = collect($options[0])->first(fn (string $option) => str_contains($option, 'value=""'));
+
+    expect($empty)->not->toBeNull()
+        ->and($empty)->not->toContain('disabled');
+});
+
+test('a project with no status can be given one', function () {
+    actingAsStatusChanger('projects.update-status');
+    $project = Project::factory()->create(['status' => null]);
+
+    statusModal($project)
+        ->set('form.status', ProjectStatus::Planning->value)
+        ->call('save')
+        ->assertHasNoErrors()
+        ->assertSet('show', false);
+
+    expect($project->fresh()->status)->toBe(ProjectStatus::Planning);
+});
+
 test('the timestamp is only confirmed for the statuses that write one', function (string $status, bool $expected) {
     actingAsStatusChanger('projects.update-status');
     $project = Project::factory()->planning()->create();
